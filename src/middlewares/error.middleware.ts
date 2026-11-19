@@ -1,53 +1,100 @@
-import mongoose from "mongoose";
 import type { NextFunction, Request, Response } from "express";
 import { ZodError } from "zod";
+import { isProd } from "../config/env.js";
+import { sendError } from "../utils/api-response.js";
 
+/** Application error with an explicit HTTP status. */
 export class HttpError extends Error {
   status: number;
   constructor(status: number, message: string) {
     super(message);
+    this.name = "HttpError";
     this.status = status;
   }
 }
 
-export function notFoundHandler(req: Request, res: Response) {
-  res.status(404).json({ success: false, message: `Route not found: ${req.method} ${req.originalUrl}` });
+export function notFoundHandler(req: Request, res: Response): void {
+  sendError(res, 404, `Route not found: ${req.method} ${req.originalUrl}`);
 }
 
-export function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction) {
+type MongoErrorShape = {
+  code?: number;
+  keyPattern?: Record<string, unknown>;
+  keyValue?: Record<string, unknown>;
+  name?: string;
+  errors?: Record<string, { message: string }>;
+};
+
+/**
+ * Single place that turns any thrown value into the standard error envelope.
+ * No stack traces or raw provider details are ever sent to clients.
+ */
+export function errorHandler(
+  err: unknown,
+  _req: Request,
+  res: Response,
+  _next: NextFunction
+): void {
+  if (res.headersSent) return;
+
   if (err instanceof HttpError) {
-    return res.status(err.status).json({ success: false, message: err.message });
+    sendError(res, err.status, err.message);
+    return;
   }
 
   if (err instanceof ZodError) {
-    return res.status(400).json({
-      success: false,
-      message: "Validation failed",
-      errors: err.flatten().fieldErrors,
-    });
+    sendError(res, 400, "Validation failed", err.flatten().fieldErrors as Record<string, string[]>);
+    return;
   }
 
-  // Mongoose duplicate key
-  if (typeof err === "object" && err !== null && "code" in err && (err as { code: number }).code === 11000) {
-    return res.status(409).json({ success: false, message: "Duplicate record — this order already exists" });
+  if (err instanceof Error && err.name === "MulterError") {
+    const code = (err as Error & { code?: string }).code;
+    const message = code === "LIMIT_FILE_SIZE" ? "Image must be 5 MB or smaller" : "Invalid upload";
+    sendError(res, 413, message);
+    return;
   }
 
-  // Mongoose cast / validation errors
-  if (typeof err === "object" && err !== null && "name" in err) {
-    const name = (err as { name: string }).name;
-    if (name === "CastError") {
-      return res.status(400).json({ success: false, message: "Invalid ID format" });
-    }
-    if (name === "ValidationError") {
-      const ve = err as unknown as { errors: Record<string, { message: string }> };
-      return res.status(400).json({
-        success: false,
-        message: "Validation failed",
-        errors: Object.fromEntries(Object.entries(ve.errors ?? {}).map(([k, v]) => [k, v.message])),
-      });
-    }
+  const mongoErr = err as MongoErrorShape | null;
+  if (mongoErr && typeof mongoErr === "object" && mongoErr.code === 11000) {
+    const field = Object.keys(mongoErr.keyPattern ?? mongoErr.keyValue ?? {})[0];
+    sendError(
+      res,
+      409,
+      field
+        ? `A record with this ${field} already exists`
+        : "Duplicate record — a record with this value already exists"
+    );
+    return;
   }
 
-  console.error("Unhandled error:", err);
-  res.status(500).json({ success: false, message: "Internal server error" });
+  if (mongoErr && typeof mongoErr === "object" && mongoErr.name === "CastError") {
+    sendError(res, 400, "Invalid ID format");
+    return;
+  }
+
+  if (mongoErr && typeof mongoErr === "object" && mongoErr.name === "ValidationError") {
+    const errors: Record<string, string[]> = Object.fromEntries(
+      Object.entries(mongoErr.errors ?? {}).map(([key, value]) => [key, [value.message]])
+    );
+    sendError(res, 400, "Validation failed", errors);
+    return;
+  }
+
+  // Stripe and other provider errors: log detail, return a safe message.
+  const providerError = err as Error & { type?: string };
+  if (
+    providerError instanceof Error &&
+    typeof providerError.type === "string" &&
+    providerError.type.startsWith("Stripe")
+  ) {
+    if (!isProd) console.error("Payment provider error:", providerError.message);
+    sendError(res, 502, "Payment provider error");
+    return;
+  }
+
+  console.error(
+    "Unhandled error:",
+    isProd && err instanceof Error ? err.message : err
+  );
+  sendError(res, 500, "Internal server error");
 }
