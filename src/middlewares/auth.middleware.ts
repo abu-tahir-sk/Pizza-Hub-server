@@ -69,7 +69,10 @@ export function requireRole(...roles: Array<"admin" | "vendor" | "customer">) {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
     if (!roles.includes(req.user.role)) {
-      return res.status(403).json({ success: false, message: "Forbidden — insufficient permissions" });
+      return res.status(403).json({
+        success: false,
+        message: `Forbidden — insufficient permissions. You are logged in as "${req.user.role}", which cannot perform this action (requires ${roles.join(" or ")}).`,
+      });
     }
     next();
   };
