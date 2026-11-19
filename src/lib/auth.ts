@@ -15,7 +15,7 @@ export const auth = betterAuth({
   secret: env.BETTER_AUTH_SECRET,
   trustedOrigins: [env.CLIENT_URL],
   database: mongodbAdapter(
-    mongooseInstance.connection.useDb("pizzahub") as unknown as mongoose.mongo.Db,
+    mongooseInstance.connection.useDb(env.MONGODB_DB_NAME) as unknown as mongoose.mongo.Db,
     { transaction: false }
   ),
   emailAndPassword: {
