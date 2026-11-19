@@ -86,8 +86,11 @@ Never commit `.env` — it is git-ignored.
 npm run seed:admin
 ```
 
-The script writes directly to the Better Auth `user` / `account` collections using ObjectIds and a
-bcrypt password hash. It is the only way to create an `admin` account; public signup always resolves
+The script writes directly to the Better Auth `user` / `account` collections. It uses an ObjectId for
+`user._id`, and the credential row follows Better Auth's contract exactly:
+`userId = user._id`, `accountId = user._id.toHexString()` and `providerId = "credential"` with a
+bcrypt password hash. It is idempotent (re-running resets the admin password and repairs the
+credential row), and it is the only way to create an `admin` account; public signup always resolves
 to `customer` or `vendor`.
 
 ## 🔌 API overview
