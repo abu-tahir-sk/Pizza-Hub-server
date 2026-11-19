@@ -18,7 +18,7 @@ const transactionSchema = new Schema(
   { timestamps: true }
 );
 
-export interface TransactionDoc extends mongoose.Document {
+export interface TransactionDoc {
   _id: Types.ObjectId;
   vendorId: Types.ObjectId;
   plan: "premium";

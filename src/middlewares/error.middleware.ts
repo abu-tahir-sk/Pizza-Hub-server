@@ -39,8 +39,12 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
       return res.status(400).json({ success: false, message: "Invalid ID format" });
     }
     if (name === "ValidationError") {
-      const ve = err as mongoose.ValidationError;
-      return res.status(400).json({ success: false, message: "Validation failed", errors: ve.errors });
+      const ve = err as unknown as { errors: Record<string, { message: string }> };
+      return res.status(400).json({
+        success: false,
+        message: "Validation failed",
+        errors: Object.fromEntries(Object.entries(ve.errors ?? {}).map(([k, v]) => [k, v.message])),
+      });
     }
   }
 

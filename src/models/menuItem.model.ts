@@ -38,7 +38,7 @@ const menuItemSchema = new Schema(
 
 menuItemSchema.index({ itemName: "text", description: "text" });
 
-export interface MenuItemDoc extends mongoose.Document {
+export interface MenuItemDoc {
   _id: Types.ObjectId;
   vendorId: Types.ObjectId;
   itemName: string;

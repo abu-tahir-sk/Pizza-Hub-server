@@ -8,9 +8,9 @@
 import "dotenv/config";
 import mongoose from "mongoose";
 import { hashPassword } from "better-auth/crypto";
-import { randomBytes } from "node:crypto";
+import { ObjectId } from "mongodb";
 import { env } from "../config/env.js";
-import { connectDB } from "../src/lib/db.js";
+import { connectDB } from "../lib/db.js";
 
 async function seedAdmin() {
   await connectDB();
@@ -28,11 +28,10 @@ async function seedAdmin() {
   }
 
   const passwordHash = await hashPassword(env.ADMIN_PASSWORD);
-  const userId = randomBytes(16).toString("hex");
+  const userId = new ObjectId();
 
   await db.collection("user").insertOne({
     _id: userId,
-    id: userId,
     name: env.ADMIN_NAME,
     email: env.ADMIN_EMAIL.toLowerCase(),
     emailVerified: true,
@@ -47,8 +46,6 @@ async function seedAdmin() {
   });
 
   await db.collection("account").insertOne({
-    _id: randomBytes(16).toString("hex"),
-    id: randomBytes(16).toString("hex"),
     userId,
     accountId: env.ADMIN_EMAIL.toLowerCase(),
     providerId: "credential",

@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { betterAuth } from "better-auth";
 import { mongodbAdapter } from "better-auth/adapters/mongodb";
 import { env } from "../config/env.js";
@@ -13,7 +14,10 @@ export const auth = betterAuth({
   baseURL: env.BETTER_AUTH_URL,
   secret: env.BETTER_AUTH_SECRET,
   trustedOrigins: [env.CLIENT_URL],
-  database: mongodbAdapter(mongooseInstance),
+  database: mongodbAdapter(
+    mongooseInstance.connection.useDb("pizzahub") as unknown as mongoose.mongo.Db,
+    { transaction: false }
+  ),
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 6,

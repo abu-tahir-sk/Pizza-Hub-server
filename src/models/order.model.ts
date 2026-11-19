@@ -25,7 +25,7 @@ orderSchema.index(
   }
 );
 
-export interface OrderDoc extends mongoose.Document {
+export interface OrderDoc {
   _id: Types.ObjectId;
   itemId: Types.ObjectId;
   vendorId: Types.ObjectId;

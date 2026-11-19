@@ -13,8 +13,12 @@ export interface PizzaHubTokenPayload {
   role: "vendor" | "customer" | "admin";
 }
 
-export function signJwt(payload: PizzaHubTokenPayload, expiresIn = "7d"): string {
-  return jwt.sign(payload, env.BETTER_AUTH_SECRET, { algorithm: "HS256", expiresIn });
+export function signJwt(
+  payload: PizzaHubTokenPayload,
+  expiresIn: jwt.SignOptions["expiresIn"] = "7d"
+): string {
+  // HS256 is the default algorithm for string secrets
+  return jwt.sign(payload, env.BETTER_AUTH_SECRET, { expiresIn });
 }
 
 export function verifyJwt(token: string): PizzaHubTokenPayload {

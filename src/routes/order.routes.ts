@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { Order, ORDER_STATUSES } from "../models/order.model.js";
+import { Order, ORDER_STATUSES, type OrderStatus } from "../models/order.model.js";
 import { MenuItem } from "../models/menuItem.model.js";
 import { User } from "../models/user.model.js";
 import { verifyJWT, requireRole, type AuthedRequest } from "../middlewares/auth.middleware.js";
@@ -15,7 +15,7 @@ const createOrderSchema = z.object({
   message: z.string().trim().max(500).optional().default(""),
 });
 
-const ACTIVE_STATUSES = ["pending", "accepted"];
+const ACTIVE_STATUSES: OrderStatus[] = ["pending", "accepted"];
 
 /* ─────────────────────────── CUSTOMER ─────────────────────────── */
 
@@ -149,7 +149,7 @@ orderRouter.get("/stats", verifyJWT, async (req: AuthedRequest, res, next) => {
     if (role === "customer") {
       const all = await Order.countDocuments({ customerId: req.user!._id });
       const [pending, accepted, rejected, cancelled] = await Promise.all(
-        ["pending", "accepted", "rejected", "cancelled"].map((s) =>
+        (["pending", "accepted", "rejected", "cancelled"] as OrderStatus[]).map((s) =>
           Order.countDocuments({ customerId: req.user!._id, status: s })
         )
       );
@@ -158,7 +158,7 @@ orderRouter.get("/stats", verifyJWT, async (req: AuthedRequest, res, next) => {
     if (role === "vendor") {
       const all = await Order.countDocuments({ vendorId: req.user!._id });
       const [pending, accepted, rejected] = await Promise.all(
-        ["pending", "accepted", "rejected"].map((s) =>
+        (["pending", "accepted", "rejected"] as OrderStatus[]).map((s) =>
           Order.countDocuments({ vendorId: req.user!._id, status: s })
         )
       );

@@ -57,7 +57,7 @@ menuRouter.get("/", async (req, res, next) => {
       };
     }
 
-    const sort = sortBy ? { price: sortDir as 1 | -1 } : { createdAt: -1 as const };
+    const sort: Record<string, 1 | -1> = sortBy ? { price: sortDir } : { createdAt: -1 };
 
     const [items, total] = await Promise.all([
       MenuItem.find(filter).sort(sort).skip((page - 1) * limit).limit(limit).populate("vendorId", "name businessName image"),
