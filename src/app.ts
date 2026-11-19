@@ -3,10 +3,12 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import { toNodeHandler } from "better-auth/node";
-import { env, isProd } from "./config/env.js";
+import { env, isProd, warnOnInsecureProductionConfig } from "./config/env.js";
+import { corsOptions } from "./config/cors.js";
 import { connectDB } from "./lib/db.js";
 import { auth } from "./lib/auth.js";
 import { notFoundHandler, errorHandler } from "./middlewares/error.middleware.js";
+import { sendSuccess } from "./utils/api-response.js";
 import { authRouter } from "./routes/auth.routes.js";
 import { menuRouter } from "./routes/menu.routes.js";
 import { orderRouter } from "./routes/order.routes.js";
@@ -22,26 +24,20 @@ export function createApp() {
   app.set("trust proxy", 1);
   app.disable("x-powered-by");
 
-  app.use(
-    cors({
-      origin: env.CLIENT_URL,
-      credentials: true,
-      methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-    })
-  );
+  app.use(cors(corsOptions));
   app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
   if (!isProd) app.use(morgan("dev"));
 
-  // 1) Better Auth handler — must come before express.json (it parses its own body)
+  // 1) Better Auth parses its own body — mount before express.json.
   app.use("/api/auth", toNodeHandler(auth));
 
-  // 2) Stripe webhook — needs the RAW body for signature verification
+  // 2) Stripe webhook needs the raw body for signature verification.
   app.use("/api/payments/webhook", webhookRouter);
 
-  // 3) JSON body parsing for everything else
+  // 3) JSON body parsing for everything else.
   app.use(express.json({ limit: "2mb" }));
 
-  app.use("/api/auth-extra", authRouter); // JWT issuance / session bridge helpers
+  app.use("/api/auth-extra", authRouter);
   app.use("/api/menu", menuRouter);
   app.use("/api/orders", orderRouter);
   app.use("/api/payments", paymentRouter);
@@ -50,7 +46,10 @@ export function createApp() {
   app.use("/api/uploads", uploadRouter);
 
   app.get("/api/health", (_req, res) => {
-    res.json({ success: true, message: "PizzaHub API is running 🍕", time: new Date().toISOString() });
+    sendSuccess(res, undefined, {
+      message: "PizzaHub API is running 🍕",
+      meta: { time: new Date().toISOString() },
+    });
   });
 
   app.use(notFoundHandler);
@@ -60,7 +59,9 @@ export function createApp() {
 }
 
 export async function startServer() {
+  warnOnInsecureProductionConfig();
   await connectDB();
+
   const app = createApp();
   app.listen(env.PORT, () => {
     console.log(`🍕 PizzaHub server listening on http://localhost:${env.PORT}`);
@@ -74,8 +75,4 @@ export async function startServer() {
   };
   process.on("SIGINT", shutdown);
   process.on("SIGTERM", shutdown);
-}
-
-if (import.meta.url === `file://${process.argv[1].replace(/\\/g, "/")}`) {
-  startServer();
 }
