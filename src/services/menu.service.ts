@@ -45,7 +45,16 @@ export async function listMenuItems(query: unknown) {
     filter.category = category;
   }
   if (location) filter.location = { $regex: location.trim(), $options: "i" };
-  if (search) filter.$text = { $search: search.trim() };
+  if (search && search.trim()) {
+    const escaped = search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = { $regex: escaped, $options: "i" };
+    filter.$or = [
+      { itemName: regex },
+      { description: regex },
+      { category: regex },
+      { location: regex },
+    ];
+  }
   if (minPrice !== undefined || maxPrice !== undefined) {
     filter.price = {
       ...(minPrice !== undefined && !Number.isNaN(minPrice) ? { $gte: minPrice } : {}),
