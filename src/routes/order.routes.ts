@@ -44,5 +44,6 @@ orderRouter.patch(
 );
 
 /* Shared */
+orderRouter.get("/verify-payment", verifyJWT, asyncRoute<AuthedRequest>(orderController.verifyPayment));
 orderRouter.get("/stats", verifyJWT, asyncRoute<AuthedRequest>(orderController.getStats));
 orderRouter.get("/:id", verifyJWT, asyncRoute<AuthedRequest>(orderController.getById));

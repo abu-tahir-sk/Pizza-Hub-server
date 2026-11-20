@@ -36,3 +36,10 @@ export async function getStats(req: AuthedRequest, res: Response): Promise<void>
 export async function getById(req: AuthedRequest, res: Response): Promise<void> {
   sendSuccess(res, await orderService.getOrderById(routeParam(req.params.id), req.user!));
 }
+
+export async function verifyPayment(req: AuthedRequest, res: Response): Promise<void> {
+  const orderId = String(req.query.orderId || "");
+  const sessionId = String(req.query.sessionId || "");
+  const result = await orderService.verifyOrderPayment(orderId, sessionId, req.user!._id);
+  sendSuccess(res, result);
+}

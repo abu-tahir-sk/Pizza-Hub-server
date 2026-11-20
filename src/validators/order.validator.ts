@@ -5,6 +5,8 @@ export const createOrderSchema = z.object({
   deliveryDate: z.coerce.date(),
   deliveryAddress: z.string().trim().min(5).max(300),
   message: z.string().trim().max(500).optional().default(""),
+  quantity: z.coerce.number().int().min(1).max(20).optional().default(1),
+  paymentMethod: z.enum(["cod", "stripe"]).optional().default("cod"),
 });
 
 export const decideOrderSchema = z.object({
