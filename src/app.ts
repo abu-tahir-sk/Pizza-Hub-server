@@ -25,9 +25,28 @@ export function createApp() {
   app.set("trust proxy", 1);
   app.disable("x-powered-by");
 
+  // Ensure DB connection for serverless invocations (e.g. Vercel)
+  app.use(async (_req, _res, next) => {
+    try {
+      await connectDB();
+      next();
+    } catch (err) {
+      next(err);
+    }
+  });
+
   app.use(cors(corsOptions));
   app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
   if (!isProd) app.use(morgan("dev"));
+
+  // Root welcoming endpoint
+  app.get("/", (_req, res) => {
+    res.json({
+      success: true,
+      message: "🍕 PizzaHub Server API is running smoothly!",
+      health: "/api/health",
+    });
+  });
 
   // 1) Better Auth parses its own body — mount before express.json.
   app.use("/api/auth", toNodeHandler(auth));
