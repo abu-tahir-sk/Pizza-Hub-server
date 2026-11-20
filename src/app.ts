@@ -1,4 +1,5 @@
 import express from "express";
+import path from "node:path";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
@@ -36,6 +37,9 @@ export function createApp() {
 
   // 3) JSON body parsing for everything else.
   app.use(express.json({ limit: "2mb" }));
+
+  // Static uploads directory for image uploads fallback
+  app.use("/uploads", express.static(path.join(process.cwd(), "public", "uploads")));
 
   app.use("/api/auth-extra", authRouter);
   app.use("/api/menu", menuRouter);

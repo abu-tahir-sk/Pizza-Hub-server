@@ -9,7 +9,7 @@ export const uploadRouter = Router();
 uploadRouter.post(
   "/image",
   verifyJWT,
-  requireRole("vendor", "customer"),
+  requireRole("admin", "vendor", "customer"),
   uploadSingleImage,
   asyncRoute(handleUpload)
 );
