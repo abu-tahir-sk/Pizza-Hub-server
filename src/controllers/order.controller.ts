@@ -25,7 +25,7 @@ export async function getVendorOrders(req: AuthedRequest, res: Response): Promis
 
 export async function decideOrder(req: AuthedRequest, res: Response): Promise<void> {
   const status = (req.body as DecideOrderInput).status;
-  const order = await orderService.decideOrder(routeParam(req.params.id), req.user!._id, { status });
+  const order = await orderService.decideOrder(routeParam(req.params.id), req.user!, { status });
   sendSuccess(res, order, { message: `Order ${status}` });
 }
 

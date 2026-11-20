@@ -38,7 +38,7 @@ orderRouter.get(
 orderRouter.patch(
   "/:id/decision",
   verifyJWT,
-  requireRole("vendor"),
+  requireRole("vendor", "admin"),
   validate({ body: decideOrderSchema }),
   asyncRoute<AuthedRequest>(orderController.decideOrder)
 );

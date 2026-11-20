@@ -22,7 +22,7 @@ menuRouter.get(
 menuRouter.post(
   "/",
   verifyJWT,
-  requireRole("vendor"),
+  requireRole("vendor", "admin"),
   validate({ body: createItemSchema }),
   asyncRoute<AuthedRequest>(menuController.createItem)
 );

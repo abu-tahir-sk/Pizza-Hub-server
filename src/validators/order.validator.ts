@@ -8,7 +8,7 @@ export const createOrderSchema = z.object({
 });
 
 export const decideOrderSchema = z.object({
-  status: z.enum(["accepted", "rejected"]),
+  status: z.enum(["pending", "accepted", "rejected", "cancelled"]),
 });
 
 export type CreateOrderInput = z.infer<typeof createOrderSchema>;

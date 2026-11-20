@@ -8,6 +8,8 @@ export const createItemSchema = z.object({
   price: z.coerce.number().min(0).max(100000),
   location: z.string().trim().min(2).max(120),
   images: z.array(z.string().url()).min(1).max(5),
+  vendorId: z.string().optional(),
+  status: z.enum(["pending", "approved", "inactive"]).optional(),
 });
 
 /** Vendors may edit content and toggle availability — never approval status. */

@@ -42,6 +42,19 @@ export async function listTransactions(req: Request, res: Response): Promise<voi
   sendSuccess(res, transactions, { meta });
 }
 
+export async function listOrders(req: Request, res: Response): Promise<void> {
+  const { orders, meta } = await adminService.listOrders(req.query);
+  sendSuccess(res, orders, { meta });
+}
+
+export async function updateOrderStatus(req: Request, res: Response): Promise<void> {
+  const { status } = req.body as {
+    status: "pending" | "accepted" | "rejected" | "cancelled";
+  };
+  const order = await adminService.setOrderStatus(routeParam(req.params.id), status);
+  sendSuccess(res, order, { message: `Order status updated to ${status}` });
+}
+
 export async function getOverview(_req: Request, res: Response): Promise<void> {
   sendSuccess(res, await adminService.getOverview());
 }

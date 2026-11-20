@@ -69,13 +69,20 @@ export async function getVendorOrders(vendorId: string) {
 
 export async function decideOrder(
   orderId: string,
-  vendorId: string,
+  actor: { _id: string; role?: string },
   decision: DecideOrderInput
 ) {
-  const order = await Order.findOne({ _id: orderId, vendorId });
+  const isAdmin = actor.role === "admin";
+  const order = isAdmin
+    ? await Order.findById(orderId)
+    : await Order.findOne({ _id: orderId, vendorId: actor._id });
+
   if (!order) throw new HttpError(404, "Order not found");
-  if (order.status !== "pending") {
-    throw new HttpError(409, `This order has already been ${order.status} — it can only be decided once`);
+  if (!isAdmin && order.status !== "pending") {
+    throw new HttpError(
+      409,
+      `This order has already been ${order.status} — it can only be decided once`
+    );
   }
   order.status = decision.status;
   await order.save();

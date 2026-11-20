@@ -9,6 +9,10 @@ export const menuStatusSchema = z.object({
   rejectionReason: z.string().trim().max(300).optional(),
 });
 
+export const orderStatusSchema = z.object({
+  status: z.enum(["pending", "accepted", "rejected", "cancelled"]),
+});
+
 export const paginationSchema = z.object({
   page: z.coerce.number().int().positive().catch(1),
   limit: z.coerce.number().int().positive().catch(10),
@@ -16,3 +20,4 @@ export const paginationSchema = z.object({
 
 export type BlockStatusInput = z.infer<typeof blockStatusSchema>;
 export type MenuStatusInput = z.infer<typeof menuStatusSchema>;
+export type OrderStatusInput = z.infer<typeof orderStatusSchema>;

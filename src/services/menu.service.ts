@@ -12,6 +12,7 @@ const MAX_FREE_ACTIVE_ITEMS = 3;
 
 export interface MenuActor {
   _id: string;
+  role?: "vendor" | "customer" | "admin";
   subscriptionPlan: "free" | "premium";
   subscriptionExpiresAt?: Date | null;
 }
@@ -99,23 +100,39 @@ export async function getVendorMenuItems(vendorId: string) {
 }
 
 export async function createMenuItem(actor: MenuActor, body: CreateItemInput) {
-  const activeCount = await MenuItem.countDocuments({
-    vendorId: actor._id,
-    status: { $in: ["approved", "pending", "inactive"] },
-  });
+  const isAdmin = actor.role === "admin";
+  const vendorId = isAdmin && body.vendorId ? body.vendorId : actor._id;
 
-  const isPremium =
-    actor.subscriptionPlan === "premium" &&
-    (!actor.subscriptionExpiresAt || actor.subscriptionExpiresAt > new Date());
+  if (!isAdmin) {
+    const activeCount = await MenuItem.countDocuments({
+      vendorId: actor._id,
+      status: { $in: ["approved", "pending", "inactive"] },
+    });
 
-  if (!isPremium && activeCount >= MAX_FREE_ACTIVE_ITEMS) {
-    throw new HttpError(
-      403,
-      `Free plan allows a maximum of ${MAX_FREE_ACTIVE_ITEMS} menu items. Upgrade to Premium for unlimited items.`
-    );
+    const isPremium =
+      actor.subscriptionPlan === "premium" &&
+      (!actor.subscriptionExpiresAt || actor.subscriptionExpiresAt > new Date());
+
+    if (!isPremium && activeCount >= MAX_FREE_ACTIVE_ITEMS) {
+      throw new HttpError(
+        403,
+        `Free plan allows a maximum of ${MAX_FREE_ACTIVE_ITEMS} menu items. Upgrade to Premium for unlimited items.`
+      );
+    }
   }
 
-  return MenuItem.create({ ...body, vendorId: actor._id, status: "pending" });
+  const status = isAdmin ? (body.status || "approved") : "pending";
+
+  return MenuItem.create({
+    itemName: body.itemName,
+    category: body.category,
+    description: body.description,
+    price: body.price,
+    location: body.location,
+    images: body.images,
+    vendorId,
+    status,
+  });
 }
 
 export async function updateMenuItem(

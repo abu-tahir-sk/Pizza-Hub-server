@@ -132,8 +132,71 @@ export async function listTransactions(query: unknown) {
   };
 }
 
+export async function listOrders(query: unknown) {
+  const q = rawQuery(query);
+  const { page, limit } = paging(q);
+  const search = str(q.search);
+  const status = str(q.status);
+
+  const filter: Record<string, unknown> = {};
+  if (status && ["pending", "accepted", "rejected", "cancelled"].includes(status)) {
+    filter.status = status;
+  }
+
+  if (search) {
+    const matchingUsers = await User.find({
+      $or: [
+        { name: { $regex: search.trim(), $options: "i" } },
+        { email: { $regex: search.trim(), $options: "i" } },
+        { businessName: { $regex: search.trim(), $options: "i" } },
+      ],
+    }).select("_id");
+    const userIds = matchingUsers.map((u) => u._id);
+
+    const matchingItems = await MenuItem.find({
+      itemName: { $regex: search.trim(), $options: "i" },
+    }).select("_id");
+    const itemIds = matchingItems.map((i) => i._id);
+
+    filter.$or = [
+      { deliveryAddress: { $regex: search.trim(), $options: "i" } },
+      { customerId: { $in: userIds } },
+      { vendorId: { $in: userIds } },
+      { itemId: { $in: itemIds } },
+    ];
+  }
+
+  const [orders, total] = await Promise.all([
+    Order.find(filter)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .populate("itemId", "itemName images price category location")
+      .populate("customerId", "name email image")
+      .populate("vendorId", "name businessName email image"),
+    Order.countDocuments(filter),
+  ]);
+
+  return { orders, meta: paginatedMeta(total, page, limit) };
+}
+
+export async function setOrderStatus(
+  id: string,
+  status: "pending" | "accepted" | "rejected" | "cancelled"
+) {
+  const order = await Order.findById(id);
+  if (!order) throw new HttpError(404, "Order not found");
+  order.status = status;
+  await order.save();
+  return order.populate([
+    { path: "itemId", select: "itemName images price category location" },
+    { path: "customerId", select: "name email image" },
+    { path: "vendorId", select: "name businessName email image" },
+  ]);
+}
+
 export async function getOverview() {
-  const [totalUsers, vendors, customers, totalMenuItems, pendingMenuItems, txAgg] =
+  const [totalUsers, vendors, customers, totalMenuItems, pendingMenuItems, txAgg, totalOrders] =
     await Promise.all([
       User.countDocuments({}),
       User.countDocuments({ role: "vendor" }),
@@ -144,6 +207,7 @@ export async function getOverview() {
         { $match: { status: "paid" } },
         { $group: { _id: null, total: { $sum: "$amount" }, count: { $sum: 1 } } },
       ]),
+      Order.countDocuments({}),
     ]);
 
   return {
@@ -154,5 +218,6 @@ export async function getOverview() {
     pendingMenuItems,
     totalTransactions: txAgg[0]?.count ?? 0,
     totalRevenue: txAgg[0]?.total ?? 0,
+    totalOrders,
   };
 }

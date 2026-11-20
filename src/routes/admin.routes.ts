@@ -2,7 +2,7 @@ import { Router } from "express";
 import { verifyJWT, requireRole } from "../middlewares/auth.middleware.js";
 import { validate } from "../middlewares/validate.middleware.js";
 import { asyncRoute } from "../utils/async-handler.js";
-import { blockStatusSchema, menuStatusSchema } from "../validators/admin.validator.js";
+import { blockStatusSchema, menuStatusSchema, orderStatusSchema } from "../validators/admin.validator.js";
 import * as adminController from "../controllers/admin.controller.js";
 
 export const adminRouter = Router();
@@ -24,6 +24,13 @@ adminRouter.patch(
   asyncRoute(adminController.updateMenuItemStatus)
 );
 adminRouter.delete("/menu-items/:id", asyncRoute(adminController.deleteMenuItem));
+
+adminRouter.get("/orders", asyncRoute(adminController.listOrders));
+adminRouter.patch(
+  "/orders/:id/status",
+  validate({ body: orderStatusSchema }),
+  asyncRoute(adminController.updateOrderStatus)
+);
 
 adminRouter.get("/transactions", asyncRoute(adminController.listTransactions));
 adminRouter.get("/overview", asyncRoute(adminController.getOverview));

@@ -26,7 +26,10 @@ export async function createItem(req: AuthedRequest, res: Response): Promise<voi
   const item = await menuService.createMenuItem(req.user!, req.body as CreateItemInput);
   sendSuccess(res, item, {
     status: 201,
-    message: "Menu item created — pending admin approval",
+    message:
+      req.user?.role === "admin"
+        ? "Menu item created and published"
+        : "Menu item created — pending admin approval",
   });
 }
 
