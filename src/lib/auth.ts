@@ -13,7 +13,16 @@ export const auth = betterAuth({
   appName: "PizzaHub",
   baseURL: env.BETTER_AUTH_URL,
   secret: env.BETTER_AUTH_SECRET,
-  trustedOrigins: [env.CLIENT_URL],
+  trustedOrigins: Array.from(
+    new Set([
+      env.CLIENT_URL,
+      "https://pizzahub-pink.vercel.app",
+      "https://pizza-hub-server-theta.vercel.app",
+      "http://localhost:3000",
+      "http://localhost:5000",
+      ...env.ADDITIONAL_CLIENT_URLS.split(",").map((s) => s.trim()).filter(Boolean),
+    ])
+  ),
   onAPIError: {
     errorURL: `${env.CLIENT_URL}/sign-in`,
   },

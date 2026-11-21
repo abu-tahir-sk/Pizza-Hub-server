@@ -28,7 +28,15 @@ for (const entry of configured) {
 export const corsOptions: CorsOptions = {
   origin(origin, callback) {
     if (!origin) return callback(null, true);
-    if (allowedOrigins.has(origin)) return callback(null, true);
+    if (
+      allowedOrigins.has(origin) ||
+      origin.endsWith(".vercel.app") ||
+      origin.includes("pizzahub") ||
+      origin.includes("localhost") ||
+      origin.includes("127.0.0.1")
+    ) {
+      return callback(null, true);
+    }
     // Returning false omits ACAO headers, so the browser blocks the request.
     return callback(null, false);
   },
