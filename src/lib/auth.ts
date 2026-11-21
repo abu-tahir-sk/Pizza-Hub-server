@@ -1,8 +1,15 @@
 import mongoose from "mongoose";
 import { betterAuth } from "better-auth";
 import { mongodbAdapter } from "better-auth/adapters/mongodb";
-import { env } from "../config/env.js";
+import { env, isProd } from "../config/env.js";
 import { mongooseInstance } from "./db.js";
+
+/**
+ * The client and API are deployed on different origins. In production the
+ * session cookie must therefore be cross-site capable (`SameSite=None` +
+ * `Secure`) or browsers will drop it and every reload looks logged-out.
+ */
+const secureCookies = env.BETTER_AUTH_URL.startsWith("https://") || isProd;
 
 /**
  * Better Auth owns the `user`, `session`, `account` and `verification`
@@ -63,6 +70,13 @@ export const auth = betterAuth({
   },
   advanced: {
     cookiePrefix: "pizzahub",
+    useSecureCookies: secureCookies,
+    defaultCookieAttributes: {
+      sameSite: secureCookies ? "none" : "lax",
+      secure: secureCookies,
+      httpOnly: true,
+      path: "/",
+    },
   },
   databaseHooks: {
     user: {
