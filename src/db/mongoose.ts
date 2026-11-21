@@ -17,9 +17,9 @@ function registerListeners(): void {
   if (listenersRegistered) return;
   listenersRegistered = true;
 
-  mongoose.connection.on("connected", () => console.log("✅ MongoDB connected"));
-  mongoose.connection.on("error", (err) => console.error("❌ MongoDB error:", err.message));
-  mongoose.connection.on("disconnected", () => console.warn("⚠️ MongoDB disconnected"));
+  mongoose.connection.on("connected", () => console.log("MongoDB connected"));
+  mongoose.connection.on("error", (err) => console.error("MongoDB error:", err.message));
+  mongoose.connection.on("disconnected", () => console.warn("MongoDB disconnected"));
 }
 
 export async function connectDB(): Promise<void> {

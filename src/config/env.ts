@@ -40,7 +40,7 @@ const parsed = schema.safeParse(process.env);
 
 if (!parsed.success) {
   // Only field names and messages are printed — never the values themselves.
-  console.error("❌ Invalid environment variables:");
+  console.error("Invalid environment variables:");
   console.error(parsed.error.flatten().fieldErrors);
   process.exit(1);
 }
@@ -69,5 +69,5 @@ export function warnOnInsecureProductionConfig(): void {
     warnings.push("IMGBB_API_KEY is not configured — image uploads will be unavailable");
   }
 
-  for (const warning of warnings) console.warn(`⚠️  Production config: ${warning}`);
+  for (const warning of warnings) console.warn(`Production config warning: ${warning}`);
 }

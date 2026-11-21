@@ -43,7 +43,7 @@ export function createApp() {
   app.get("/", (_req, res) => {
     res.json({
       success: true,
-      message: "🍕 PizzaHub Server API is running smoothly!",
+      message: "PizzaHub Server API is running smoothly!",
       health: "/api/health",
     });
   });
@@ -70,7 +70,7 @@ export function createApp() {
 
   app.get("/api/health", (_req, res) => {
     sendSuccess(res, undefined, {
-      message: "PizzaHub API is running 🍕",
+      message: "PizzaHub API is running",
       meta: { time: new Date().toISOString() },
     });
   });
@@ -87,7 +87,7 @@ export async function startServer() {
 
   const app = createApp();
   app.listen(env.PORT, () => {
-    console.log(`🍕 PizzaHub server listening on http://localhost:${env.PORT}`);
+    console.log(`PizzaHub server listening on http://localhost:${env.PORT}`);
   });
 
   const shutdown = async () => {

@@ -9,7 +9,7 @@ if (!process.env.VERCEL) {
   warnOnInsecureProductionConfig();
   await connectDB();
   app.listen(env.PORT, () => {
-    console.log(`🍕 PizzaHub server listening on http://localhost:${env.PORT}`);
+    console.log(`PizzaHub server listening on http://localhost:${env.PORT}`);
   });
 
   const shutdown = async () => {
