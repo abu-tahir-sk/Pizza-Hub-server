@@ -3,7 +3,6 @@ import { getStripe } from "../lib/stripe.js";
 import { env } from "../config/env.js";
 import { Transaction } from "../models/transaction.model.js";
 import { User } from "../models/user.model.js";
-import { Order } from "../models/order.model.js";
 
 const PREMIUM_DURATION_DAYS = 30;
 
@@ -34,39 +33,7 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session;
 
-      // 1. Pizza Order Online Payment
-      if (session.metadata?.type === "pizza_order" && session.metadata?.orderId) {
-        const orderId = session.metadata.orderId;
-        const vendorId = session.metadata.vendorId;
-        const customerId = session.metadata.customerId;
-
-        await Order.findByIdAndUpdate(orderId, {
-          paymentStatus: "paid",
-          stripeSessionId: session.id,
-        });
-
-        await Transaction.findOneAndUpdate(
-          { stripeSessionId: session.id },
-          {
-            $setOnInsert: {
-              vendorId,
-              customerId,
-              orderId,
-              plan: "pizza_order",
-              amount: (session.amount_total ?? 0) / 100,
-              currency: session.currency ?? "usd",
-              stripeSessionId: session.id,
-              status: "paid",
-            },
-          },
-          { upsert: true, new: true }
-        );
-
-        console.log(`✅ Pizza order ${orderId} marked as paid via Stripe webhook`);
-        return;
-      }
-
-      // 2. Vendor Subscription Upgrade
+      // Vendor Subscription Upgrade — the only Stripe payment PizzaHub accepts.
       const vendorId = session.metadata?.vendorId;
       const purpose = session.metadata?.purpose;
       if (purpose !== "vendor_subscription" || !vendorId || session.status !== "complete") {
@@ -91,7 +58,7 @@ export async function handleStripeEvent(event: Stripe.Event): Promise<void> {
         subscriptionPlan: "premium",
         subscriptionExpiresAt: expiresAt,
       });
-      console.log(`✅ Premium activated for vendor ${vendorId} until ${expiresAt.toISOString()}`);
+      console.log(`Premium activated for vendor ${vendorId} until ${expiresAt.toISOString()}`);
       return;
     }
 
