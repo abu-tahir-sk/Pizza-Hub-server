@@ -14,3 +14,8 @@ userRouter.patch(
   validate({ body: updateProfileSchema }),
   asyncRoute<AuthedRequest>(userController.updateMe)
 );
+userRouter.post(
+  "/become-vendor",
+  verifyJWT,
+  asyncRoute<AuthedRequest>(userController.becomeVendor)
+);
