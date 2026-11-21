@@ -1,16 +1,16 @@
-# 🍕 PizzaHub — API Server
+# PizzaHub — API Server
 
 REST API for the PizzaHub pizza ordering & delivery platform. Built with **Express 5**, **MongoDB
 (Mongoose)**, **Better Auth** and **Stripe**.
 
-> **Live links** — replace these placeholders after deployment:
+> **Live links**
 >
-> - API: `https://pizzahub-api.onrender.com`
-> - Client: `https://pizzahub-client.vercel.app`
+> - API: `https://pizza-hub-server-theta.vercel.app`
+> - Client: `https://pizza-hub-client.vercel.app` (set `NEXT_PUBLIC_API_URL` to the API URL above)
 >
 > Health check: `GET /api/health`
 
-## ✨ Features
+## Features
 
 - **Better Auth** email/password + Google OAuth, MongoDB adapter
 - Session → JWT bridge (`POST /api/auth-extra/token`) with HS256 tokens
@@ -25,7 +25,7 @@ REST API for the PizzaHub pizza ordering & delivery platform. Built with **Expre
 - Secure admin seeding script (no public admin signup)
 - Validation with Zod, centralized error handling, Helmet, CORS, request logging
 
-## 🧱 Tech stack
+## Tech stack
 
 | Layer | Tech |
 | --- | --- |
@@ -38,7 +38,7 @@ REST API for the PizzaHub pizza ordering & delivery platform. Built with **Expre
 | Images | ImgBB |
 | Validation | Zod |
 
-## 🚀 Getting started
+## Getting started
 
 ```bash
 # 1. install dependencies
@@ -58,7 +58,7 @@ npm run seed:admin
 
 The client (`../client`) expects this API at `http://localhost:5000` by default.
 
-## 🔑 Environment variables
+## Environment variables
 
 | Name | Required | Description |
 | --- | --- | --- |
@@ -80,7 +80,7 @@ The client (`../client`) expects this API at `http://localhost:5000` by default.
 
 Never commit `.env` — it is git-ignored.
 
-## 🧪 Admin seed
+## Admin seed
 
 ```bash
 npm run seed:admin
@@ -93,7 +93,7 @@ bcrypt password hash. It is idempotent (re-running resets the admin password and
 credential row), and it is the only way to create an `admin` account; public signup always resolves
 to `customer` or `vendor`.
 
-## 🔌 API overview
+## API overview
 
 | Method & path | Access | Purpose |
 | --- | --- | --- |
@@ -111,7 +111,7 @@ to `customer` or `vendor`.
 | `GET /api/orders/vendor` | vendor | Orders for own items |
 | `PATCH /api/orders/:id/cancel` | customer (owner) | Cancel a pending order |
 | `PATCH /api/orders/:id/decision` | vendor (owner) | Accept / reject |
-| `GET /api/orders/stats` | customer | Own order stats |
+| `GET /api/orders/stats` | authenticated | Role-scoped order statistics |
 | `POST /api/payments/create-checkout-session` | vendor | Stripe Checkout |
 | `GET /api/payments/verify` | vendor (owner) | Verify a checkout session |
 | `GET /api/payments/my-transactions` | vendor | Own payment history |
@@ -126,7 +126,70 @@ to `customer` or `vendor`.
 | `DELETE /api/admin/menu-items/:id` | admin | Delete item |
 | `GET /api/admin/transactions` | admin | Read-only payments + revenue |
 
-## 🛡️ Security model
+## Implementation notes
+
+### Authentication & authorization flow
+
+1. The client signs in through **Better Auth** and then calls `POST /api/auth-extra/token` with the
+   session cookie. The server mints a short-lived **HS256 JWT** containing the user id.
+2. Every business route is wrapped by `verifyJWT`. It reads `Authorization: Bearer <token>`, verifies
+   the signature/expiry, then **re-loads the user from MongoDB** on each request. This means a blocked
+   user or a deleted account loses access immediately, even while holding an unexpired token.
+3. `verifyJWT` rejects missing/invalid tokens with `401`, and blocked users with `403`.
+4. `requireRole("customer" | "vendor" | "admin")` adds role checks and returns `403` on mismatch.
+5. Ownership is enforced in the database query itself (`{ _id, vendorId: req.user._id }`), so a
+   vendor/customer cannot read or mutate another user's rows even by guessing an id.
+6. Profile updates (`PATCH /api/users/me`) accept only `name` and `image`. The Zod schema strips
+   `role`, `isBlocked`, `subscriptionPlan` and `subscriptionExpiresAt`, so privilege escalation through
+   the profile endpoint is impossible. Admins cannot block other admins.
+
+### Menu search, filter, sort & pagination
+
+`GET /api/menu` accepts the following query parameters (all optional):
+
+| Param | Values | Default | Behaviour |
+| --- | --- | --- | --- |
+| `search` | text | — | Case-insensitive match on item name and description |
+| `category` | one of `MENU_CATEGORIES` | — | Exact category filter |
+| `location` | text | — | Case-insensitive location match |
+| `sortBy` | `createdAt`, `price` | `createdAt` | Sort field |
+| `sortDir` | `asc`, `desc` | `desc` | Sort direction |
+| `page` | integer ≥ 1 | `1` | 1-based page number |
+| `limit` | 1–50 | `9` | Page size |
+
+The response includes `data` plus pagination metadata (`page`, `limit`, `total`, `totalPages`). Only
+`status: "approved"` items are ever returned publicly; pending/rejected/inactive items are hidden and
+`GET /api/menu/:id` returns `404` for them.
+
+### Order rules
+
+- Statuses: `pending → accepted | rejected`, plus `cancelled` (customer only, and only while pending).
+- A vendor may decide an order **once**; a second decision returns `409`.
+- Duplicate guard: a customer cannot have two `pending`/`accepted` orders for the same item on the
+  same delivery date (`409`).
+- Self-ordering is blocked (`403`), and only `approved` items can be ordered.
+- Delivery dates must be in the future.
+- **Customer orders are cash-on-delivery only.** Stripe is used exclusively for vendor subscription
+  upgrades; there is no online payment path for pizza orders.
+
+### Payments (vendor subscriptions only)
+
+1. `POST /api/payments/create-checkout-session` creates a Stripe Checkout session and a `pending`
+   transaction row. The vendor is redirected to Stripe's hosted page.
+2. Premium is **never** granted from the success redirect. The client can only read status.
+3. `POST /api/payments/webhook` verifies the Stripe signature against the raw body, then atomically
+   moves the transaction `pending → paid`. Premium is activated only when that transition succeeds,
+   which also makes webhook redelivery idempotent.
+4. Expired/failed checkout sessions are marked `expired`/`failed`. Expired Premium plans fall back to
+   `free` on the next authenticated request.
+
+### Database collections
+
+There are exactly four business collections: **users**, **menuItems**, **orders**, and
+**transactions**. Better Auth keeps its own `session`/`account` collections; no extra business
+collections are introduced.
+
+## Security model
 
 - Better Auth owns sessions; business APIs require `Authorization: Bearer <JWT>`.
 - `verifyJWT` re-checks the user in MongoDB on every request, so blocking a user takes effect
@@ -136,7 +199,7 @@ to `customer` or `vendor`.
 - Stripe webhook uses the raw request body and signature verification; metadata (vendor + plan) is
   trusted because it was written server-side.
 
-## 📜 Scripts
+## Scripts
 
 | Script | Description |
 | --- | --- |
@@ -146,7 +209,7 @@ to `customer` or `vendor`.
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run seed:admin` | Create/update the admin account |
 
-## ☁️ Deployment
+## Deployment
 
 1. Set every variable from `.env.example` in your host (Render/Railway/Fly/etc.).
 2. Set `BETTER_AUTH_URL` to the public API URL and `CLIENT_URL` to the deployed client.
