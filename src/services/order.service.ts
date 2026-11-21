@@ -1,9 +1,5 @@
 import { Order, type OrderStatus } from "../models/order.model.js";
 import { MenuItem } from "../models/menuItem.model.js";
-import { User } from "../models/user.model.js";
-import { Transaction } from "../models/transaction.model.js";
-import { getStripe } from "../lib/stripe.js";
-import { env } from "../config/env.js";
 import { HttpError } from "../middlewares/error.middleware.js";
 import type { CreateOrderInput, DecideOrderInput } from "../validators/order.validator.js";
 
@@ -44,17 +40,16 @@ export async function createOrder(customerId: string, body: CreateOrderInput) {
 
   const quantity = Math.max(1, body.quantity || 1);
   const totalAmount = Math.round(item.price * quantity * 100) / 100;
-  const paymentMethod = body.paymentMethod === "stripe" ? "stripe" : "cod";
 
-  const customerUser = await User.findById(customerId);
-
+  // Customer orders are cash-on-delivery only. Online payment is reserved for
+  // vendor subscriptions (see payment.service.ts).
   const order = await Order.create({
     itemId: item._id,
     vendorId,
     customerId,
     quantity,
     totalAmount,
-    paymentMethod,
+    paymentMethod: "cod",
     paymentStatus: "unpaid",
     deliveryDate: body.deliveryDate,
     deliveryAddress: body.deliveryAddress,
@@ -62,93 +57,7 @@ export async function createOrder(customerId: string, body: CreateOrderInput) {
     status: "pending",
   });
 
-  // If online payment with Stripe is chosen
-  if (paymentMethod === "stripe" && env.STRIPE_SECRET_KEY) {
-    const stripe = getStripe();
-    const origin = env.CLIENT_URL;
-
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      customer_email: customerUser?.email,
-      line_items: [
-        {
-          quantity,
-          price_data: {
-            currency: "usd",
-            unit_amount: Math.round(item.price * 100),
-            product_data: {
-              name: `${item.itemName} (${quantity}x)`,
-              description: `Fresh hot pizza delivery to ${body.deliveryAddress}`,
-              images: item.images?.[0] ? [item.images[0]] : [],
-            },
-          },
-        },
-      ],
-      metadata: {
-        type: "pizza_order",
-        orderId: order._id.toString(),
-        customerId: String(customerId),
-        vendorId: String(vendorId),
-      },
-      success_url: `${origin}/payment/success?session_id={CHECKOUT_SESSION_ID}&order_id=${order._id}`,
-      cancel_url: `${origin}/menu/${item._id}?cancelled=true`,
-    });
-
-    order.stripeSessionId = session.id;
-    await order.save();
-
-    return {
-      order,
-      checkoutUrl: session.url,
-    };
-  }
-
-  return {
-    order,
-    checkoutUrl: null,
-  };
-}
-
-export async function verifyOrderPayment(orderId: string, sessionId: string, customerId: string) {
-  const order = await Order.findById(orderId)
-    .populate("itemId", "itemName images price category")
-    .populate("vendorId", "name businessName");
-  if (!order) throw new HttpError(404, "Order not found");
-  if (String(order.customerId) !== String(customerId)) {
-    throw new HttpError(403, "You do not have access to this order");
-  }
-
-  if (order.paymentStatus === "paid") {
-    return { order, paymentStatus: "paid" };
-  }
-
-  const stripe = getStripe();
-  const session = await stripe.checkout.sessions.retrieve(sessionId);
-
-  if (session.payment_status === "paid") {
-    order.paymentStatus = "paid";
-    order.stripeSessionId = session.id;
-    await order.save();
-
-    await Transaction.findOneAndUpdate(
-      { stripeSessionId: session.id },
-      {
-        $setOnInsert: {
-          vendorId: order.vendorId,
-          customerId: order.customerId,
-          orderId: order._id,
-          plan: "pizza_order",
-          amount: (session.amount_total ?? 0) / 100,
-          currency: session.currency ?? "usd",
-          stripeSessionId: session.id,
-          status: "paid",
-        },
-      },
-      { upsert: true, new: true }
-    );
-  }
-
-  return { order, paymentStatus: order.paymentStatus };
+  return { order, checkoutUrl: null };
 }
 
 export async function cancelOrder(orderId: string, customerId: string) {
