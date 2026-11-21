@@ -44,9 +44,9 @@ export async function uploadImage(file: Express.Multer.File): Promise<{ url: str
       if (result?.success && result.data?.url) {
         return { url: result.data.display_url ?? result.data.url };
       }
-      console.warn("⚠️ ImgBB API error, falling back to local storage:", result?.error?.message ?? response.statusText);
+      console.warn("ImgBB API error, falling back to local storage:", result?.error?.message ?? response.statusText);
     } catch (err: any) {
-      console.warn("⚠️ ImgBB request failed, falling back to local storage:", err?.message);
+      console.warn("ImgBB request failed, falling back to local storage:", err?.message);
     }
   }
 

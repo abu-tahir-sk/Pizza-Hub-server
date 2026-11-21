@@ -1,3 +1,4 @@
+import { isValidObjectId } from "mongoose";
 import { MenuItem, MENU_CATEGORIES } from "../models/menuItem.model.js";
 import { Order } from "../models/order.model.js";
 import { HttpError } from "../middlewares/error.middleware.js";
@@ -85,11 +86,16 @@ export async function getFeaturedMenu() {
 }
 
 export async function getMenuItemById(id: string) {
-  const item = await MenuItem.findById(id).populate(
+  // Invalid ObjectIds are treated as "not found" instead of a 500 error.
+  if (!isValidObjectId(id)) throw new HttpError(404, "Menu item not found");
+
+  // Only approved items are public. Pending, rejected and inactive items must
+  // never be reachable from the storefront.
+  const item = await MenuItem.findOne({ _id: id, status: "approved" }).populate(
     "vendorId",
     "name businessName image subscriptionPlan"
   );
-  if (!item || (item.status !== "approved" && item.status !== "inactive")) {
+  if (!item) {
     throw new HttpError(404, "Menu item not found");
   }
   return item;
@@ -137,9 +143,10 @@ export async function createMenuItem(actor: MenuActor, body: CreateItemInput) {
 
 export async function updateMenuItem(
   id: string,
-  vendorId: string,
+  actor: MenuActor,
   body: UpdateItemInput
 ) {
+  const vendorId = actor._id;
   const item = await MenuItem.findOne({ _id: id, vendorId });
   if (!item) throw new HttpError(404, "Menu item not found");
 
@@ -150,6 +157,28 @@ export async function updateMenuItem(
     }
     if (item.status === "pending") {
       throw new HttpError(403, "This item is awaiting admin approval.");
+    }
+
+    // Re-activating an item counts against the free-plan cap. This matters for
+    // vendors who downgraded from Premium and already own more than 3 items.
+    if (body.status === "active" && item.status !== "approved") {
+      const isPremium =
+        actor.subscriptionPlan === "premium" &&
+        (!actor.subscriptionExpiresAt || actor.subscriptionExpiresAt > new Date());
+
+      if (!isPremium) {
+        const activeCount = await MenuItem.countDocuments({
+          vendorId,
+          status: { $in: ["approved", "inactive"] },
+          _id: { $ne: item._id },
+        });
+        if (activeCount >= MAX_FREE_ACTIVE_ITEMS) {
+          throw new HttpError(
+            403,
+            `Free plan allows a maximum of ${MAX_FREE_ACTIVE_ITEMS} active menu items. Upgrade to Premium for unlimited items.`
+          );
+        }
+      }
     }
   }
 

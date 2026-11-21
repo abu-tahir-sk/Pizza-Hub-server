@@ -36,7 +36,7 @@ export async function createItem(req: AuthedRequest, res: Response): Promise<voi
 export async function updateItem(req: AuthedRequest, res: Response): Promise<void> {
   const item = await menuService.updateMenuItem(
     routeParam(req.params.id),
-    req.user!._id,
+    req.user!,
     req.body as UpdateItemInput
   );
   sendSuccess(res, item, { message: "Menu item updated" });
