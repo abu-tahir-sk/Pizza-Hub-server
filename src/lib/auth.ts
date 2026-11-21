@@ -9,7 +9,10 @@ import { mongooseInstance } from "./db.js";
  * session cookie must therefore be cross-site capable (`SameSite=None` +
  * `Secure`) or browsers will drop it and every reload looks logged-out.
  */
-const secureCookies = env.BETTER_AUTH_URL.startsWith("https://") || isProd;
+const secureCookies =
+  env.BETTER_AUTH_URL.startsWith("https://") ||
+  isProd ||
+  Boolean(process.env.VERCEL);
 
 /**
  * Better Auth owns the `user`, `session`, `account` and `verification`
@@ -32,6 +35,13 @@ export const auth = betterAuth({
   ),
   onAPIError: {
     errorURL: `${env.CLIENT_URL}/sign-in`,
+  },
+  account: {
+    accountLinking: {
+      enabled: true,
+      trustedProviders: ["google"],
+    },
+    skipStateCookieCheck: true,
   },
   database: mongodbAdapter(
     mongooseInstance.connection.useDb(env.MONGODB_DB_NAME) as unknown as mongoose.mongo.Db,
