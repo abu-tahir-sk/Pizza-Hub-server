@@ -14,6 +14,9 @@ export const auth = betterAuth({
   baseURL: env.BETTER_AUTH_URL,
   secret: env.BETTER_AUTH_SECRET,
   trustedOrigins: [env.CLIENT_URL],
+  onAPIError: {
+    errorURL: `${env.CLIENT_URL}/sign-in`,
+  },
   database: mongodbAdapter(
     mongooseInstance.connection.useDb(env.MONGODB_DB_NAME) as unknown as mongoose.mongo.Db,
     { transaction: false }

@@ -47,6 +47,17 @@ export async function verifyJWT(req: AuthedRequest, res: Response, next: NextFun
       return res.status(403).json({ success: false, message: "Your account has been blocked" });
     }
 
+    // Expired Premium subscriptions fall back to the Free plan automatically.
+    if (
+      user.subscriptionPlan === "premium" &&
+      user.subscriptionExpiresAt &&
+      user.subscriptionExpiresAt.getTime() <= Date.now()
+    ) {
+      user.subscriptionPlan = "free";
+      user.subscriptionExpiresAt = null;
+      await user.save();
+    }
+
     req.user = {
       _id: user._id.toString(),
       name: user.name,
