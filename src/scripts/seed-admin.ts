@@ -94,13 +94,13 @@ async function seedAdmin() {
 
   console.log(
     existing
-      ? `✅ Admin repaired: ${ADMIN_EMAIL} (role=admin, password reset)`
-      : `✅ Admin created: ${ADMIN_EMAIL}`
+      ? `Admin repaired: ${ADMIN_EMAIL} (role=admin, password reset)`
+      : `Admin created: ${ADMIN_EMAIL}`
   );
   await mongoose.disconnect();
 }
 
 seedAdmin().catch((err) => {
-  console.error("❌ Seed failed:", err);
+  console.error("Seed failed:", err);
   process.exit(1);
 });

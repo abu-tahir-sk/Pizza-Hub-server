@@ -486,11 +486,11 @@ async function seedPizzas() {
   }
 
   const total = await MenuItem.countDocuments();
-  console.log(`\n🎉 Done! Seeded ${PIZZAS_DATA.length} items (${createdCount} created, ${updatedCount} updated). Total in DB: ${total}`);
+  console.log(`\nDone! Seeded ${PIZZAS_DATA.length} items (${createdCount} created, ${updatedCount} updated). Total in DB: ${total}`);
   await mongoose.disconnect();
 }
 
 seedPizzas().catch((err) => {
-  console.error("❌ Seeding failed:", err);
+  console.error("Seeding failed:", err);
   process.exit(1);
 });
