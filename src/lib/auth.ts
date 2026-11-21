@@ -94,6 +94,18 @@ export const auth = betterAuth({
           };
         },
       },
+      update: {
+        before: async (data) => {
+          // Never allow privilege fields to be changed through Better Auth's
+          // public /update-user endpoint, even if a client sends them directly.
+          const safe = { ...(data as Record<string, unknown>) };
+          delete safe.role;
+          delete safe.isBlocked;
+          delete safe.subscriptionPlan;
+          delete safe.subscriptionExpiresAt;
+          return { data: safe };
+        },
+      },
     },
   },
   plugins: [],
