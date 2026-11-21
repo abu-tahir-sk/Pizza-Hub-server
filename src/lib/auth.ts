@@ -86,6 +86,7 @@ export const auth = betterAuth({
       secure: secureCookies,
       httpOnly: true,
       path: "/",
+      partitioned: secureCookies,
     },
   },
   databaseHooks: {
