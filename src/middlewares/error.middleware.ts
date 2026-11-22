@@ -94,7 +94,7 @@ export function errorHandler(
 
   console.error(
     "Unhandled error:",
-    isProd && err instanceof Error ? err.message : err
+    err instanceof Error ? err.stack || err.message : err
   );
-  sendError(res, 500, "Internal server error");
+  sendError(res, 500, err instanceof Error ? err.message : "Internal server error");
 }

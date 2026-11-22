@@ -27,7 +27,11 @@ export function createApp() {
   app.disable("x-powered-by");
 
   // Ensure DB connection for serverless invocations (e.g. Vercel)
-  app.use(async (_req, _res, next) => {
+  app.use(async (req, _res, next) => {
+    if (req.path === "/" || req.path === "/api/health") {
+      connectDB().catch((e) => console.warn("Background DB connection warning:", e.message));
+      return next();
+    }
     try {
       await connectDB();
       next();
@@ -173,10 +177,20 @@ export function createApp() {
   app.use("/api/uploads", uploadRouter);
 
   app.get("/api/health", (_req, res) => {
-    sendSuccess(res, undefined, {
-      message: "PizzaHub API is running",
-      meta: { time: new Date().toISOString() },
-    });
+    sendSuccess(
+      res,
+      {
+        dbStatus: mongoose.connection.readyState === 1 ? "connected" : "connecting_or_disconnected",
+        hasMongoUri: Boolean(process.env.MONGODB_URI),
+        isVercel: Boolean(process.env.VERCEL),
+        clientUrl: env.CLIENT_URL,
+        betterAuthUrl: env.BETTER_AUTH_URL,
+      },
+      {
+        message: "PizzaHub API is running",
+        meta: { time: new Date().toISOString() },
+      }
+    );
   });
 
   app.use(notFoundHandler);
