@@ -20,7 +20,7 @@
 import "dotenv/config";
 import mongoose from "mongoose";
 import { hashPassword } from "better-auth/crypto";
-import { ObjectId } from "mongodb";
+const { ObjectId } = mongoose.Types;
 import { env } from "../config/env.js";
 import { connectDB } from "../lib/db.js";
 

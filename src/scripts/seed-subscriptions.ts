@@ -1,6 +1,7 @@
 import "dotenv/config";
 import mongoose from "mongoose";
-import { ObjectId } from "mongodb";
+type ObjectId = mongoose.Types.ObjectId;
+const ObjectId = mongoose.Types.ObjectId;
 import { hashPassword } from "better-auth/crypto";
 import { connectDB } from "../lib/db.js";
 import { Transaction } from "../models/transaction.model.js";

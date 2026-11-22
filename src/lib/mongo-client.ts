@@ -1,9 +1,11 @@
-import { MongoClient } from "mongodb";
+import mongoose from "mongoose";
 import { env } from "../config/env.js";
 
+const { MongoClient } = mongoose.mongo;
+
 /**
- * Dedicated native MongoDB client for Better Auth with connection pooling
- * configured for serverless execution.
+ * Dedicated native MongoDB client for Better Auth using Mongoose's bundled
+ * MongoDB driver to ensure 100% zero-dependency serverless compatibility on Vercel.
  */
 export const mongoClient = new MongoClient(env.MONGODB_URI, {
   serverSelectionTimeoutMS: 10_000,
