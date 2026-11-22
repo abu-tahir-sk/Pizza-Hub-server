@@ -8,6 +8,7 @@ import { env, isProd, warnOnInsecureProductionConfig } from "./config/env.js";
 import { corsOptions } from "./config/cors.js";
 import { connectDB } from "./lib/db.js";
 import { auth } from "./lib/auth.js";
+import { authDb } from "./lib/mongo-client.js";
 import { notFoundHandler, errorHandler } from "./middlewares/error.middleware.js";
 import { sendSuccess } from "./utils/api-response.js";
 import { authRouter } from "./routes/auth.routes.js";
@@ -54,6 +55,30 @@ export function createApp() {
   app.use("/api/auth", async (req, res, next) => {
     // Intercept OAuth callback redirects to bridge the session token across decoupled domains
     if (req.originalUrl?.includes("/callback/")) {
+      try {
+        // Self-healing: if an OAuth account exists whose userId no longer exists in user collection,
+        // clean it up so Better Auth will never fail with "unable_to_link_account".
+        const oauthAccounts = await authDb
+          .collection("account")
+          .find({ providerId: { $ne: "credential" } })
+          .toArray();
+        if (oauthAccounts.length > 0) {
+          const users = await authDb
+            .collection("user")
+            .find({}, { projection: { _id: 1 } })
+            .toArray();
+          const validUserIds = new Set(users.map((u) => String(u._id)));
+          const orphanedIds = oauthAccounts
+            .filter((a) => !validUserIds.has(String(a.userId)))
+            .map((a) => a._id);
+          if (orphanedIds.length > 0) {
+            await authDb.collection("account").deleteMany({ _id: { $in: orphanedIds } });
+          }
+        }
+      } catch (cleanupErr) {
+        console.warn("OAuth orphaned account cleanup warning:", cleanupErr);
+      }
+
       try {
         const proto = req.headers["x-forwarded-proto"] || (req.secure ? "https" : "http");
         const host = req.headers.host;
