@@ -1,8 +1,11 @@
-import mongoose from "mongoose";
+import { MongoClient } from "mongodb";
 import { betterAuth } from "better-auth";
 import { mongodbAdapter } from "better-auth/adapters/mongodb";
 import { env, isProd } from "../config/env.js";
-import { mongooseInstance } from "./db.js";
+
+/** Native MongoDB client dedicated to Better Auth with full transaction & aggregation support */
+const mongoClient = new MongoClient(env.MONGODB_URI);
+const authDb = mongoClient.db(env.MONGODB_DB_NAME);
 
 /**
  * The client and API are deployed on different origins. In production the
@@ -43,10 +46,9 @@ export const auth = betterAuth({
     },
     skipStateCookieCheck: true,
   },
-  database: mongodbAdapter(
-    mongooseInstance.connection.useDb(env.MONGODB_DB_NAME) as unknown as mongoose.mongo.Db,
-    { transaction: false }
-  ),
+  database: mongodbAdapter(authDb, {
+    client: mongoClient,
+  }),
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 6,
@@ -86,7 +88,6 @@ export const auth = betterAuth({
       secure: secureCookies,
       httpOnly: true,
       path: "/",
-      partitioned: secureCookies,
     },
   },
   databaseHooks: {

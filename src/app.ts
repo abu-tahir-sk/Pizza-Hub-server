@@ -49,7 +49,39 @@ export function createApp() {
   });
 
   // 1) Better Auth parses its own body — mount before express.json.
-  app.use("/api/auth", toNodeHandler(auth));
+  // Intercept OAuth callback redirects to bridge the session token across decoupled domains
+  app.use("/api/auth", (req, res, next) => {
+    if (req.originalUrl?.includes("/callback/")) {
+      const origWriteHead = res.writeHead.bind(res);
+      res.writeHead = function (statusCode: number, ...args: any[]) {
+        if (statusCode >= 300 && statusCode < 400) {
+          const location = res.getHeader("Location") || res.getHeader("location");
+          const setCookie = res.getHeader("Set-Cookie") || res.getHeader("set-cookie");
+
+          if (location && typeof location === "string" && setCookie) {
+            const cookieArr = Array.isArray(setCookie) ? setCookie : [setCookie.toString()];
+            let extractedToken: string | null = null;
+
+            for (const cookieStr of cookieArr) {
+              const match = /(?:pizzahub|better-auth)\.session_token=([^;.\s]+)/i.exec(cookieStr);
+              if (match?.[1]) {
+                extractedToken = match[1];
+                break;
+              }
+            }
+
+            if (extractedToken && !location.includes("session_token=")) {
+              const separator = location.includes("?") ? "&" : "?";
+              res.setHeader("Location", `${location}${separator}session_token=${extractedToken}`);
+            }
+          }
+        }
+        return (origWriteHead as any)(statusCode, ...args);
+      };
+    }
+
+    return toNodeHandler(auth)(req, res);
+  });
 
   // 2) Stripe webhook needs the raw body for signature verification.
   app.use("/api/payments/webhook", webhookRouter);

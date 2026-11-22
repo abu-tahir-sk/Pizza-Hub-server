@@ -4,6 +4,10 @@ import { exchangeSessionForJwt } from "../services/auth.service.js";
 import { sendSuccess } from "../utils/api-response.js";
 
 export async function exchangeToken(req: AuthedRequest, res: Response): Promise<void> {
-  const result = await exchangeSessionForJwt(req.headers);
+  const queryToken =
+    (typeof req.query?.session_token === "string" ? req.query.session_token : undefined) ||
+    (typeof req.body?.session_token === "string" ? req.body.session_token : undefined) ||
+    (typeof req.headers["x-session-token"] === "string" ? req.headers["x-session-token"] : undefined);
+  const result = await exchangeSessionForJwt(req.headers, queryToken);
   sendSuccess(res, result);
 }
