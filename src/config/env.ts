@@ -1,3 +1,4 @@
+
 import "dotenv/config";
 import { z } from "zod";
 
@@ -75,11 +76,11 @@ const schema = z.object({
   BETTER_AUTH_URL: z
     .string()
     .transform((v) => {
-      if (Boolean(process.env.VERCEL)) return "https://pizza-hub-server-theta.vercel.app";
-      return normalizeUrl(v, "https://pizza-hub-server-theta.vercel.app");
+      if (Boolean(process.env.VERCEL)) return "https://pizza-hub-server-six.vercel.app";
+      return normalizeUrl(v, "https://pizza-hub-server-six.vercel.app");
     })
     .pipe(z.string().url())
-    .default("https://pizza-hub-server-theta.vercel.app"),
+    .default("https://pizza-hub-server-six.vercel.app"),
 
   GOOGLE_CLIENT_ID: z
     .string()

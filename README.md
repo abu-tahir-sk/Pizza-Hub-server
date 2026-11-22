@@ -5,8 +5,10 @@ REST API for the PizzaHub pizza ordering & delivery platform. Built with **Expre
 
 > **Live links**
 >
-> - API: `https://pizza-hub-server-theta.vercel.app`
-> - Client: `https://pizza-hub-client.vercel.app` (set `NEXT_PUBLIC_API_URL` to the API URL above)
+> - API Server: `https://pizza-hub-server-six.vercel.app`
+> - Client Application: `https://pizzahub-pink.vercel.app`
+> - Server GitHub Repository: `https://github.com/abu-tahir-sk/Pizza-Hub-server`
+> - Client GitHub Repository: `https://github.com/abu-tahir-sk/Pizza-Hub-client`
 >
 > Health check: `GET /api/health`
 

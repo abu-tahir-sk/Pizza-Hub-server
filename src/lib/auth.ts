@@ -20,7 +20,7 @@ function resolveAuthBaseUrl(): string {
     ) {
       return raw;
     }
-    return "https://pizza-hub-server-theta.vercel.app";
+    return "https://pizza-hub-server-six.vercel.app";
   }
   return env.BETTER_AUTH_URL;
 }
@@ -52,6 +52,7 @@ export const auth = betterAuth({
       "https://pizzahub-pink.vercel.app",
       "https://pizza-hub-client.vercel.app",
       "https://pizzahub-client.vercel.app",
+      "https://pizza-hub-server-six.vercel.app",
       "https://pizza-hub-server-theta.vercel.app",
       "http://localhost:3000",
       "http://localhost:5000",
