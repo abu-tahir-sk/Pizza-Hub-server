@@ -3,6 +3,7 @@ import path from "node:path";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
+import mongoose from "mongoose";
 import { toNodeHandler } from "better-auth/node";
 import { env, isProd, warnOnInsecureProductionConfig } from "./config/env.js";
 import { corsOptions } from "./config/cors.js";
