@@ -4,12 +4,36 @@ import { env, isProd } from "../config/env.js";
 import { mongoClient, authDb } from "./mongo-client.js";
 
 /**
+ * In production or remote deployments, Better Auth's baseURL MUST be the server's
+ * own origin (where /api/auth/* lives), NOT the client's origin. If BETTER_AUTH_URL
+ * was mistakenly set to the client URL or is pointing to localhost while running
+ * on Vercel, we automatically use the server's canonical origin.
+ */
+function resolveAuthBaseUrl(): string {
+  if (isProd || Boolean(process.env.VERCEL)) {
+    const raw = env.BETTER_AUTH_URL;
+    if (
+      raw &&
+      !raw.includes("localhost") &&
+      !raw.includes("127.0.0.1") &&
+      !raw.includes("pizzahub-pink.vercel.app")
+    ) {
+      return raw;
+    }
+    return "https://pizza-hub-server-theta.vercel.app";
+  }
+  return env.BETTER_AUTH_URL;
+}
+
+const authBaseUrl = resolveAuthBaseUrl();
+
+/**
  * The client and API are deployed on different origins. In production the
  * session cookie must therefore be cross-site capable (`SameSite=None` +
  * `Secure`) or browsers will drop it and every reload looks logged-out.
  */
 const secureCookies =
-  env.BETTER_AUTH_URL.startsWith("https://") ||
+  authBaseUrl.startsWith("https://") ||
   isProd ||
   Boolean(process.env.VERCEL);
 
@@ -20,7 +44,7 @@ const secureCookies =
  */
 export const auth = betterAuth({
   appName: "PizzaHub",
-  baseURL: env.BETTER_AUTH_URL,
+  baseURL: authBaseUrl,
   secret: env.BETTER_AUTH_SECRET,
   trustedOrigins: Array.from(
     new Set([
