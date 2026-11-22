@@ -1,9 +1,11 @@
 import { getStripe } from "../lib/stripe.js";
 import { env } from "../config/env.js";
 import { Transaction } from "../models/transaction.model.js";
+import { User } from "../models/user.model.js";
 import { HttpError } from "../middlewares/error.middleware.js";
 
 const PREMIUM_PRICE = 29.99; // USD — used when STRIPE_PREMIUM_PRICE_ID is not configured
+const PREMIUM_DURATION_DAYS = 30;
 
 export interface PaymentActor {
   _id: string;
@@ -13,7 +15,7 @@ export interface PaymentActor {
 /**
  * Creates a Checkout session for the authenticated vendor only.
  * Ownership is written into trusted session metadata; the client cannot
- * influence it. Premium is activated exclusively by the verified webhook.
+ * influence it. Premium is activated by verified webhook or verified session sync.
  */
 export async function createCheckoutSession(actor: PaymentActor) {
   const stripe = getStripe();
@@ -61,12 +63,42 @@ export async function createCheckoutSession(actor: PaymentActor) {
   return { sessionId: session.id, url: session.url };
 }
 
-export function getMyTransactions(vendorId: string) {
-  return Transaction.find({ vendorId }).sort({ createdAt: -1 });
+export async function getMyTransactions(vendorId: string) {
+  const transactions = await Transaction.find({ vendorId }).sort({ createdAt: -1 });
+
+  // Sync recent pending transactions directly with Stripe API
+  try {
+    const stripe = getStripe();
+    for (const tx of transactions.slice(0, 3)) {
+      if (tx.status === "pending" && tx.stripeSessionId) {
+        try {
+          const session = await stripe.checkout.sessions.retrieve(tx.stripeSessionId);
+          if (session.payment_status === "paid" || session.status === "complete") {
+            tx.status = "paid";
+            tx.amount = (session.amount_total ?? 0) / 100 || tx.amount;
+            await tx.save();
+
+            const expiresAt = new Date(Date.now() + PREMIUM_DURATION_DAYS * 24 * 60 * 60 * 1000);
+            await User.findByIdAndUpdate(vendorId, {
+              subscriptionPlan: "premium",
+              subscriptionExpiresAt: expiresAt,
+            });
+          }
+        } catch {
+          // ignore session retrieval error
+        }
+      }
+    }
+  } catch {
+    // ignore stripe API error
+  }
+
+  return transactions;
 }
 
 /**
- * Read-only confirmation for the success page. Never activates premium.
+ * Verifies the session with Stripe API and transitions transaction/user to paid/premium
+ * if Stripe confirms payment.
  */
 export async function verifyCheckoutSession(sessionId: string, actor: PaymentActor) {
   const stripe = getStripe();
@@ -76,6 +108,31 @@ export async function verifyCheckoutSession(sessionId: string, actor: PaymentAct
     throw new HttpError(403, "You do not have access to this transaction");
   }
 
-  const transaction = await Transaction.findOne({ stripeSessionId: sessionId });
+  let transaction = await Transaction.findOne({ stripeSessionId: sessionId });
+
+  // If the Stripe session is paid or complete, activate premium and update transaction
+  if (session.payment_status === "paid" || session.status === "complete") {
+    if (!transaction || transaction.status === "pending") {
+      transaction = await Transaction.findOneAndUpdate(
+        { stripeSessionId: sessionId },
+        {
+          $set: {
+            status: "paid",
+            amount: (session.amount_total ?? 0) / 100 || transaction?.amount || PREMIUM_PRICE,
+            currency: session.currency ?? "usd",
+          },
+        },
+        { new: true, upsert: false }
+      );
+
+      const expiresAt = new Date(Date.now() + PREMIUM_DURATION_DAYS * 24 * 60 * 60 * 1000);
+      await User.findByIdAndUpdate(actor._id, {
+        subscriptionPlan: "premium",
+        subscriptionExpiresAt: expiresAt,
+      });
+      console.log(`Payment verified and premium activated for vendor ${actor._id} via session verification`);
+    }
+  }
+
   return { paymentStatus: session.payment_status, transaction };
 }
