@@ -49,38 +49,74 @@ export function createApp() {
   });
 
   // 1) Better Auth parses its own body — mount before express.json.
-  // Intercept OAuth callback redirects to bridge the session token across decoupled domains
-  app.use("/api/auth", (req, res, next) => {
+  const authNodeHandler = toNodeHandler(auth);
+
+  app.use("/api/auth", async (req, res, next) => {
+    // Intercept OAuth callback redirects to bridge the session token across decoupled domains
     if (req.originalUrl?.includes("/callback/")) {
-      const origWriteHead = res.writeHead.bind(res);
-      res.writeHead = function (statusCode: number, ...args: any[]) {
-        if (statusCode >= 300 && statusCode < 400) {
-          const location = res.getHeader("Location") || res.getHeader("location");
-          const setCookie = res.getHeader("Set-Cookie") || res.getHeader("set-cookie");
+      try {
+        const proto = req.headers["x-forwarded-proto"] || (req.secure ? "https" : "http");
+        const host = req.headers.host;
+        const fullUrl = `${proto}://${host}${req.originalUrl}`;
 
-          if (location && typeof location === "string" && setCookie) {
-            const cookieArr = Array.isArray(setCookie) ? setCookie : [setCookie.toString()];
-            let extractedToken: string | null = null;
-
-            for (const cookieStr of cookieArr) {
-              const match = /(?:pizzahub|better-auth)\.session_token=([^;.\s]+)/i.exec(cookieStr);
-              if (match?.[1]) {
-                extractedToken = match[1];
-                break;
-              }
-            }
-
-            if (extractedToken && !location.includes("session_token=")) {
-              const separator = location.includes("?") ? "&" : "?";
-              res.setHeader("Location", `${location}${separator}session_token=${extractedToken}`);
-            }
+        const webHeaders = new Headers();
+        for (const [k, v] of Object.entries(req.headers)) {
+          if (v) {
+            if (Array.isArray(v)) v.forEach((item) => webHeaders.append(k, item));
+            else webHeaders.set(k, v);
           }
         }
-        return (origWriteHead as any)(statusCode, ...args);
-      };
+
+        const webReq = new Request(fullUrl, {
+          method: req.method,
+          headers: webHeaders,
+        });
+
+        const webRes = await auth.handler(webReq);
+
+        if (webRes.status >= 300 && webRes.status < 400) {
+          const loc = webRes.headers.get("Location") || webRes.headers.get("location");
+          const setCookies = webRes.headers.getSetCookie?.() || [webRes.headers.get("set-cookie") || ""];
+
+          let extractedToken: string | null = null;
+          for (const c of setCookies) {
+            const m = /(?:pizzahub|better-auth)\.session_token=([^;.\s]+)/i.exec(c);
+            if (m?.[1]) {
+              extractedToken = matchToken(m[1]);
+              break;
+            }
+          }
+
+          function matchToken(val: string): string {
+            return val;
+          }
+
+          let finalLoc = loc;
+          if (finalLoc && extractedToken && !finalLoc.includes("session_token=")) {
+            const sep = finalLoc.includes("?") ? "&" : "?";
+            finalLoc = `${finalLoc}${sep}session_token=${extractedToken}`;
+          }
+
+          res.statusCode = webRes.status;
+          for (const [k, v] of webRes.headers.entries()) {
+            if (k.toLowerCase() === "location" || k.toLowerCase() === "set-cookie") continue;
+            res.setHeader(k, v);
+          }
+          if (finalLoc) {
+            res.setHeader("Location", finalLoc);
+          }
+          for (const c of setCookies) {
+            if (c) res.append("Set-Cookie", c);
+          }
+          res.end();
+          return;
+        }
+      } catch (err) {
+        console.error("OAuth callback bridge error:", err);
+      }
     }
 
-    return toNodeHandler(auth)(req, res);
+    return authNodeHandler(req, res);
   });
 
   // 2) Stripe webhook needs the raw body for signature verification.
