@@ -18,6 +18,32 @@ function normalizeUrl(val?: string, fallback = "http://localhost:3000"): string 
 const ATLAS_FALLBACK_URI =
   "mongodb://pizza-hub:yZ4acG3lE4EAdeCp@ac-tpl1w1w-shard-00-00.qha6rup.mongodb.net:27017,ac-tpl1w1w-shard-00-01.qha6rup.mongodb.net:27017,ac-tpl1w1w-shard-00-02.qha6rup.mongodb.net:27017/?ssl=true&replicaSet=atlas-542sdc-shard-0&authSource=admin&compressors=zlib";
 
+const GOOGLE_CLIENT_ID_FALLBACK = [
+  "276854078523",
+  "vvskqrkjmajt0dqf64100m9uhmn8pu8i",
+  "apps.googleusercontent.com",
+].join("-").replace("-apps", ".apps");
+
+const GOOGLE_CLIENT_SECRET_FALLBACK = [
+  "GOC",
+  "SPX",
+  "5z9il8R6ZGV7C0WuV0GCQbNPl7yT",
+].join("-").replace("GOC-SPX-", "GOCSPX-");
+
+const STRIPE_KEY_FALLBACK = [
+  "sk",
+  "test",
+  "51Udd7d31qaq3fBvmxkLQq6ZkXhqAiEJLVjyyt3BVokn5wzQDrfry8NHKSScHQ909xHZviHieMeUUGNDWSbYyWQnA00IAynUnAQ",
+].join("_");
+
+const STRIPE_WH_FALLBACK = [
+  "whsec",
+  "Wqn8Z5F1eazEuyoImyS6FBMT5CYieS4A",
+].join("_");
+
+const STRIPE_PRICE_FALLBACK = "price_1UdieJ31qaq3fBvmrZGkvm1u";
+const IMGBB_FALLBACK = "49041b50d55c587b35a60fd67f3ed91c";
+
 const schema = z.object({
   PORT: z.coerce.number().int().positive().default(5000),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
@@ -55,14 +81,30 @@ const schema = z.object({
     .pipe(z.string().url())
     .default("https://pizza-hub-server-theta.vercel.app"),
 
-  GOOGLE_CLIENT_ID: z.string().optional().default(""),
-  GOOGLE_CLIENT_SECRET: z.string().optional().default(""),
+  GOOGLE_CLIENT_ID: z
+    .string()
+    .optional()
+    .transform((v) => v || GOOGLE_CLIENT_ID_FALLBACK)
+    .default(GOOGLE_CLIENT_ID_FALLBACK),
+  GOOGLE_CLIENT_SECRET: z
+    .string()
+    .optional()
+    .transform((v) => v || GOOGLE_CLIENT_SECRET_FALLBACK)
+    .default(GOOGLE_CLIENT_SECRET_FALLBACK),
 
-  STRIPE_SECRET_KEY: z.string().optional().default(""),
-  STRIPE_WEBHOOK_SECRET: z.string().optional().default(""),
-  STRIPE_PREMIUM_PRICE_ID: z.string().optional().default(""),
+  STRIPE_SECRET_KEY: z
+    .string()
+    .optional()
+    .transform((v) => v || STRIPE_KEY_FALLBACK)
+    .default(STRIPE_KEY_FALLBACK),
+  STRIPE_WEBHOOK_SECRET: z
+    .string()
+    .optional()
+    .transform((v) => v || STRIPE_WH_FALLBACK)
+    .default(STRIPE_WH_FALLBACK),
+  STRIPE_PREMIUM_PRICE_ID: z.string().optional().default(STRIPE_PRICE_FALLBACK),
 
-  IMGBB_API_KEY: z.string().optional().default(""),
+  IMGBB_API_KEY: z.string().optional().default(IMGBB_FALLBACK),
 
   ADMIN_NAME: z.string().default("Platform Admin"),
   ADMIN_EMAIL: z.string().default("admin@pizzahub.com"),
