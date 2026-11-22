@@ -3,11 +3,10 @@ import path from "node:path";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
-import mongoose from "mongoose";
 import { toNodeHandler } from "better-auth/node";
 import { env, isProd, warnOnInsecureProductionConfig } from "./config/env.js";
 import { corsOptions } from "./config/cors.js";
-import { connectDB } from "./lib/db.js";
+import { connectDB, getConnection } from "./lib/db.js";
 import { auth } from "./lib/auth.js";
 import { authDb } from "./lib/mongo-client.js";
 import { notFoundHandler, errorHandler } from "./middlewares/error.middleware.js";
@@ -181,7 +180,7 @@ export function createApp() {
     sendSuccess(
       res,
       {
-        dbStatus: mongoose.connection.readyState === 1 ? "connected" : "connecting_or_disconnected",
+        dbStatus: getConnection().readyState === 1 ? "connected" : "connecting_or_disconnected",
         hasMongoUri: Boolean(process.env.MONGODB_URI),
         isVercel: Boolean(process.env.VERCEL),
         clientUrl: env.CLIENT_URL,
