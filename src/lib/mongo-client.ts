@@ -1,18 +1,15 @@
-import mongoose from "mongoose";
+import { MongoClient, type Db } from "mongodb";
 import { env } from "../config/env.js";
 
-const { MongoClient } = mongoose.mongo;
-
 /**
- * Dedicated native MongoDB client for Better Auth using Mongoose's bundled
- * MongoDB driver to ensure 100% zero-dependency serverless compatibility on Vercel.
+ * Dedicated native MongoDB client for Better Auth using the official MongoDB driver.
  */
 export const mongoClient = new MongoClient(env.MONGODB_URI, {
   serverSelectionTimeoutMS: 10_000,
   maxPoolSize: 10,
 });
 
-export const authDb = mongoClient.db(env.MONGODB_DB_NAME);
+export const authDb: Db = mongoClient.db(env.MONGODB_DB_NAME);
 
 let isConnected = false;
 

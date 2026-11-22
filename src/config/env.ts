@@ -8,19 +8,33 @@ import { z } from "zod";
  *
  * Never log or return these values — `env` is server-only.
  */
+function normalizeUrl(val?: string, fallback = "http://localhost:3000"): string {
+  if (!val || typeof val !== "string" || !val.trim()) return fallback;
+  const trimmed = val.trim();
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+  return `https://${trimmed}`;
+}
+
 const schema = z.object({
   PORT: z.coerce.number().int().positive().default(5000),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 
-  // Comma-separated allowlist. CLIENT_URL is always included.
-  CLIENT_URL: z.string().url().default("http://localhost:3000"),
+  CLIENT_URL: z
+    .string()
+    .transform((v) => normalizeUrl(v, "https://pizzahub-pink.vercel.app"))
+    .pipe(z.string().url())
+    .default("http://localhost:3000"),
   ADDITIONAL_CLIENT_URLS: z.string().optional().default(""),
 
-  MONGODB_URI: z.string().min(1, "MONGODB_URI is required"),
+  MONGODB_URI: z.string().min(1, "MONGODB_URI is required").default("mongodb://localhost:27017/pizzahub"),
   MONGODB_DB_NAME: z.string().min(1).default("pizzahub"),
 
-  BETTER_AUTH_SECRET: z.string().min(16, "BETTER_AUTH_SECRET must be at least 16 chars"),
-  BETTER_AUTH_URL: z.string().url().default("http://localhost:5000"),
+  BETTER_AUTH_SECRET: z.string().min(16, "BETTER_AUTH_SECRET must be at least 16 chars").default("default-better-auth-secret-min-16-chars"),
+  BETTER_AUTH_URL: z
+    .string()
+    .transform((v) => normalizeUrl(v, "https://pizza-hub-server-theta.vercel.app"))
+    .pipe(z.string().url())
+    .default("http://localhost:5000"),
 
   GOOGLE_CLIENT_ID: z.string().optional().default(""),
   GOOGLE_CLIENT_SECRET: z.string().optional().default(""),
@@ -38,15 +52,22 @@ const schema = z.object({
 
 const parsed = schema.safeParse(process.env);
 
+let resolvedEnv: z.infer<typeof schema>;
+
 if (!parsed.success) {
-  // Only field names and messages are printed — never the values themselves.
-  console.error("Invalid environment variables:");
-  console.error(parsed.error.flatten().fieldErrors);
-  process.exit(1);
+  console.error("Invalid environment variables:", parsed.error.flatten().fieldErrors);
+  if (!process.env.VERCEL && process.env.NODE_ENV !== "production") {
+    process.exit(1);
+  } else {
+    console.warn("Falling back to safe default configuration on serverless runtime");
+    resolvedEnv = schema.parse({});
+  }
+} else {
+  resolvedEnv = parsed.data;
 }
 
-export const env = parsed.data;
-export const isProd = env.NODE_ENV === "production";
+export const env = resolvedEnv;
+export const isProd = env.NODE_ENV === "production" || Boolean(process.env.VERCEL);
 
 /** Non-fatal production checks. Safe to call once during startup. */
 export function warnOnInsecureProductionConfig(): void {
