@@ -50,6 +50,8 @@ export const auth = betterAuth({
     new Set([
       env.CLIENT_URL,
       "https://pizzahub-pink.vercel.app",
+      "https://pizza-hub-client.vercel.app",
+      "https://pizzahub-client.vercel.app",
       "https://pizza-hub-server-theta.vercel.app",
       "http://localhost:3000",
       "http://localhost:5000",
