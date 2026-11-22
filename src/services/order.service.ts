@@ -57,7 +57,7 @@ export async function createOrder(customerId: string, body: CreateOrderInput) {
     status: "pending",
   });
 
-  return { order, checkoutUrl: null };
+  return order;
 }
 
 export async function cancelOrder(orderId: string, customerId: string) {
