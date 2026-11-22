@@ -20,6 +20,17 @@ export interface SessionExchangeResult {
   };
 }
 
+function cleanSessionToken(val: string): string {
+  let cleaned = decodeURIComponent(val.trim());
+  if (cleaned.startsWith("s:")) {
+    cleaned = cleaned.slice(2);
+  }
+  if (cleaned.includes(".")) {
+    cleaned = cleaned.split(".")[0];
+  }
+  return cleaned.trim();
+}
+
 /**
  * Validates a Better Auth session cookie or explicit session token and mints
  * the short-lived JWT used by the Express business APIs.
@@ -35,8 +46,12 @@ export async function exchangeSessionForJwt(
   if (rawSessionToken && typeof rawSessionToken === "string") {
     try {
       const db = mongoose.connection.useDb(env.MONGODB_DB_NAME);
+      const cleaned = cleanSessionToken(rawSessionToken);
       const sessionDoc = await db.collection("session").findOne({
-        token: rawSessionToken.trim(),
+        $or: [
+          { token: cleaned },
+          { token: rawSessionToken.trim() },
+        ],
         expiresAt: { $gt: new Date() },
       });
       if (sessionDoc?.userId) {
@@ -57,7 +72,13 @@ export async function exchangeSessionForJwt(
 
   if (!userId) throw new HttpError(401, "Unauthorized — no active session");
 
-  const dbUser = await User.findById(userId);
+  let dbUser = await User.findById(userId);
+  if (!dbUser && mongoose.isValidObjectId(userId)) {
+    dbUser = await User.findById(new mongoose.Types.ObjectId(userId));
+  }
+  if (!dbUser) {
+    dbUser = await User.findOne({ _id: userId });
+  }
   if (!dbUser) throw new HttpError(401, "Unauthorized — user no longer exists");
   if (dbUser.isBlocked) throw new HttpError(403, "Your account has been blocked");
 

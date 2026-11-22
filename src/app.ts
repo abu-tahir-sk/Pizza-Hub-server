@@ -109,15 +109,36 @@ export function createApp() {
 
           let extractedToken: string | null = null;
           for (const c of setCookies) {
-            const m = /(?:pizzahub|better-auth)\.session_token=([^;.\s]+)/i.exec(c);
+            const m = /(?:better-auth|pizzahub)[._]session[._]token=([^;\s]+)/i.exec(c);
             if (m?.[1]) {
-              extractedToken = matchToken(m[1]);
-              break;
+              let t = decodeURIComponent(m[1].trim());
+              if (t.startsWith("s:")) t = t.slice(2);
+              if (t.includes(".")) t = t.split(".")[0];
+              if (t.trim()) {
+                extractedToken = t.trim();
+                break;
+              }
             }
           }
 
-          function matchToken(val: string): string {
-            return val;
+          // DB fallback: if cookies were stripped or differently named, pick the session just created
+          if (!extractedToken) {
+            try {
+              const latest = await authDb
+                .collection("session")
+                .find({})
+                .sort({ createdAt: -1 })
+                .limit(1)
+                .toArray();
+              if (latest.length > 0 && latest[0].token) {
+                const diff = Date.now() - new Date(latest[0].createdAt).getTime();
+                if (diff < 60_000) {
+                  extractedToken = String(latest[0].token);
+                }
+              }
+            } catch (fallbackDbErr) {
+              console.warn("DB session token fallback error:", fallbackDbErr);
+            }
           }
 
           let finalLoc = loc;
