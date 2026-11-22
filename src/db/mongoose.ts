@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { env } from "../config/env.js";
+import { connectMongoClient } from "../lib/mongo-client.js";
 
 /**
  * Single MongoDB connection utility.
@@ -23,16 +24,22 @@ function registerListeners(): void {
 }
 
 export async function connectDB(): Promise<void> {
-  if (mongoose.connection.readyState === 1) return;
+  if (mongoose.connection.readyState === 1) {
+    await connectMongoClient();
+    return;
+  }
   if (connecting) return connecting;
 
   registerListeners();
 
   connecting = (async () => {
-    await mongoose.connect(env.MONGODB_URI, {
-      dbName: env.MONGODB_DB_NAME,
-      serverSelectionTimeoutMS: 10_000,
-    });
+    await Promise.all([
+      mongoose.connect(env.MONGODB_URI, {
+        dbName: env.MONGODB_DB_NAME,
+        serverSelectionTimeoutMS: 10_000,
+      }),
+      connectMongoClient(),
+    ]);
   })();
 
   try {

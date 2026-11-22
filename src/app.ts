@@ -116,7 +116,18 @@ export function createApp() {
       }
     }
 
-    return authNodeHandler(req, res);
+    try {
+      await authNodeHandler(req, res);
+    } catch (err: any) {
+      console.error("Better Auth handler error:", err);
+      if (!res.headersSent) {
+        res.status(err?.status || err?.statusCode || 500).json({
+          success: false,
+          message: err?.message || "Authentication error",
+          code: err?.code || "AUTH_ERROR",
+        });
+      }
+    }
   });
 
   // 2) Stripe webhook needs the raw body for signature verification.

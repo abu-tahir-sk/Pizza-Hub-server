@@ -1,11 +1,7 @@
-import { MongoClient } from "mongodb";
 import { betterAuth } from "better-auth";
 import { mongodbAdapter } from "better-auth/adapters/mongodb";
 import { env, isProd } from "../config/env.js";
-
-/** Native MongoDB client dedicated to Better Auth with full transaction & aggregation support */
-const mongoClient = new MongoClient(env.MONGODB_URI);
-const authDb = mongoClient.db(env.MONGODB_DB_NAME);
+import { mongoClient, authDb } from "./mongo-client.js";
 
 /**
  * The client and API are deployed on different origins. In production the
@@ -37,7 +33,11 @@ export const auth = betterAuth({
     ])
   ),
   onAPIError: {
+    throw: true,
     errorURL: `${env.CLIENT_URL}/sign-in`,
+    onError: async (error) => {
+      console.error("Better Auth API error:", error);
+    },
   },
   account: {
     accountLinking: {
@@ -48,6 +48,7 @@ export const auth = betterAuth({
   },
   database: mongodbAdapter(authDb, {
     client: mongoClient,
+    transaction: false,
   }),
   emailAndPassword: {
     enabled: true,
