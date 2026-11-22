@@ -15,6 +15,9 @@ function normalizeUrl(val?: string, fallback = "http://localhost:3000"): string 
   return `https://${trimmed}`;
 }
 
+const ATLAS_FALLBACK_URI =
+  "mongodb://pizza-hub:yZ4acG3lE4EAdeCp@ac-tpl1w1w-shard-00-00.qha6rup.mongodb.net:27017,ac-tpl1w1w-shard-00-01.qha6rup.mongodb.net:27017,ac-tpl1w1w-shard-00-02.qha6rup.mongodb.net:27017/?ssl=true&replicaSet=atlas-542sdc-shard-0&authSource=admin&compressors=zlib";
+
 const schema = z.object({
   PORT: z.coerce.number().int().positive().default(5000),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
@@ -23,18 +26,34 @@ const schema = z.object({
     .string()
     .transform((v) => normalizeUrl(v, "https://pizzahub-pink.vercel.app"))
     .pipe(z.string().url())
-    .default("http://localhost:3000"),
+    .default("https://pizzahub-pink.vercel.app"),
   ADDITIONAL_CLIENT_URLS: z.string().optional().default(""),
 
-  MONGODB_URI: z.string().min(1, "MONGODB_URI is required").default("mongodb://localhost:27017/pizzahub"),
+  MONGODB_URI: z
+    .string()
+    .optional()
+    .transform((v) => {
+      if (!v || v.includes("localhost") || v.includes("127.0.0.1")) {
+        return ATLAS_FALLBACK_URI;
+      }
+      return v;
+    })
+    .default(ATLAS_FALLBACK_URI),
   MONGODB_DB_NAME: z.string().min(1).default("pizzahub"),
 
-  BETTER_AUTH_SECRET: z.string().min(16, "BETTER_AUTH_SECRET must be at least 16 chars").default("default-better-auth-secret-min-16-chars"),
+  BETTER_AUTH_SECRET: z
+    .string()
+    .optional()
+    .transform((v) => v || "195b3000c2ebabc4f640bf3ae49140cbacb1a72c111494a9544d3c2910dfa053")
+    .default("195b3000c2ebabc4f640bf3ae49140cbacb1a72c111494a9544d3c2910dfa053"),
   BETTER_AUTH_URL: z
     .string()
-    .transform((v) => normalizeUrl(v, "https://pizza-hub-server-theta.vercel.app"))
+    .transform((v) => {
+      if (Boolean(process.env.VERCEL)) return "https://pizza-hub-server-theta.vercel.app";
+      return normalizeUrl(v, "https://pizza-hub-server-theta.vercel.app");
+    })
     .pipe(z.string().url())
-    .default("http://localhost:5000"),
+    .default("https://pizza-hub-server-theta.vercel.app"),
 
   GOOGLE_CLIENT_ID: z.string().optional().default(""),
   GOOGLE_CLIENT_SECRET: z.string().optional().default(""),
