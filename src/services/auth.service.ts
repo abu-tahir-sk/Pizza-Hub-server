@@ -42,7 +42,10 @@ export async function exchangeSessionForJwt(
 ): Promise<SessionExchangeResult> {
   let userId: string | null = null;
 
-  // 1. If explicit token is a valid PizzaHub JWT, extract userId
+  // 1. If explicit token is a PizzaHub JWT, extract userId.
+  //    Accept expired JWTs too — decode the payload without verification
+  //    so we can re-issue a fresh token even when the old one expired
+  //    but the Better Auth session cookie is unavailable (cross-domain).
   if (rawSessionToken && typeof rawSessionToken === "string" && rawSessionToken.includes(".")) {
     try {
       const payload = verifyJwt(rawSessionToken);
@@ -50,7 +53,15 @@ export async function exchangeSessionForJwt(
         userId = payload.sub;
       }
     } catch {
-      // not a JWT, continue to session token lookup
+      // JWT may be expired — decode payload without verification to recover userId
+      try {
+        const payload = JSON.parse(
+          Buffer.from(rawSessionToken.split(".")[1], "base64").toString("utf-8")
+        );
+        if (payload?.sub) userId = payload.sub;
+      } catch {
+        // not a decodable JWT, continue to session token lookup
+      }
     }
   }
 
@@ -97,7 +108,15 @@ export async function exchangeSessionForJwt(
         const payload = verifyJwt(bearer);
         if (payload?.sub) userId = payload.sub;
       } catch {
-        // ignore
+        // JWT may be expired — decode payload without verification to recover userId
+        try {
+          const payload = JSON.parse(
+            Buffer.from(bearer.split(".")[1], "base64").toString("utf-8")
+          );
+          if (payload?.sub) userId = payload.sub;
+        } catch {
+          // ignore
+        }
       }
     } else {
       try {
