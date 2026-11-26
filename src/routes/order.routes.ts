@@ -11,20 +11,20 @@ export const orderRouter = Router();
 orderRouter.get(
   "/my",
   verifyJWT,
-  requireRole("customer"),
+  requireRole("customer", "admin", "vendor"),
   asyncRoute<AuthedRequest>(orderController.getMyOrders)
 );
 orderRouter.post(
   "/",
   verifyJWT,
-  requireRole("customer"),
+  requireRole("customer", "admin", "vendor"),
   validate({ body: createOrderSchema }),
   asyncRoute<AuthedRequest>(orderController.placeOrder)
 );
 orderRouter.patch(
   "/:id/cancel",
   verifyJWT,
-  requireRole("customer"),
+  requireRole("customer", "admin", "vendor"),
   asyncRoute<AuthedRequest>(orderController.cancelOrder)
 );
 

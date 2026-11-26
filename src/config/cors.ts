@@ -42,7 +42,14 @@ export const corsOptions: CorsOptions = {
   },
   credentials: true,
   methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "x-session-token",
+    "x-requested-with",
+    "accept",
+    "origin",
+  ],
   maxAge: 600,
 };
 

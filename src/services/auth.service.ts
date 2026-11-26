@@ -1,7 +1,7 @@
 import type { Request } from "express";
 import mongoose from "mongoose";
 import { auth } from "../lib/auth.js";
-import { signJwt } from "../lib/jwt.js";
+import { signJwt, verifyJwt } from "../lib/jwt.js";
 import { User } from "../models/user.model.js";
 import { HttpError } from "../middlewares/error.middleware.js";
 import { env } from "../config/env.js";
@@ -42,8 +42,20 @@ export async function exchangeSessionForJwt(
 ): Promise<SessionExchangeResult> {
   let userId: string | null = null;
 
-  // 1. Try explicit session token if supplied (e.g. from cross-domain OAuth redirect)
-  if (rawSessionToken && typeof rawSessionToken === "string") {
+  // 1. If explicit token is a valid PizzaHub JWT, extract userId
+  if (rawSessionToken && typeof rawSessionToken === "string" && rawSessionToken.includes(".")) {
+    try {
+      const payload = verifyJwt(rawSessionToken);
+      if (payload?.sub) {
+        userId = payload.sub;
+      }
+    } catch {
+      // not a JWT, continue to session token lookup
+    }
+  }
+
+  // 2. Try explicit session token if supplied (e.g. from Better Auth session)
+  if (!userId && rawSessionToken && typeof rawSessionToken === "string") {
     try {
       const db = mongoose.connection.useDb(env.MONGODB_DB_NAME);
       const cleaned = cleanSessionToken(rawSessionToken);
@@ -51,6 +63,9 @@ export async function exchangeSessionForJwt(
         $or: [
           { token: cleaned },
           { token: rawSessionToken.trim() },
+          ...(mongoose.isValidObjectId(rawSessionToken.trim())
+            ? [{ _id: new mongoose.Types.ObjectId(rawSessionToken.trim()) }]
+            : []),
         ],
         expiresAt: { $gt: new Date() },
       });
@@ -62,11 +77,39 @@ export async function exchangeSessionForJwt(
     }
   }
 
-  // 2. Cookie-based Better Auth session check
+  // 3. Cookie-based Better Auth session check
   if (!userId) {
-    const session = await auth.api.getSession({ headers });
-    if (session?.user?.id) {
-      userId = session.user.id;
+    try {
+      const session = await auth.api.getSession({ headers });
+      if (session?.user?.id) {
+        userId = session.user.id;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // 4. Authorization Bearer header fallback
+  if (!userId && headers.authorization?.startsWith("Bearer ")) {
+    const bearer = headers.authorization.slice(7).trim();
+    if (bearer.includes(".")) {
+      try {
+        const payload = verifyJwt(bearer);
+        if (payload?.sub) userId = payload.sub;
+      } catch {
+        // ignore
+      }
+    } else {
+      try {
+        const db = mongoose.connection.useDb(env.MONGODB_DB_NAME);
+        const sessionDoc = await db.collection("session").findOne({
+          $or: [{ token: bearer }, { token: bearer.trim() }],
+          expiresAt: { $gt: new Date() },
+        });
+        if (sessionDoc?.userId) userId = sessionDoc.userId.toString();
+      } catch {
+        // ignore
+      }
     }
   }
 

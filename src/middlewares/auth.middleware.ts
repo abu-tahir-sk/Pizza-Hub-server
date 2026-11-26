@@ -1,6 +1,8 @@
 import type { NextFunction, Request, Response } from "express";
+import mongoose from "mongoose";
 import { verifyJwt } from "../lib/jwt.js";
 import { User } from "../models/user.model.js";
+import { env } from "../config/env.js";
 
 export interface AuthedRequest extends Request {
   user?: {
@@ -32,14 +34,37 @@ export async function verifyJWT(req: AuthedRequest, res: Response, next: NextFun
       return res.status(401).json({ success: false, message: "Unauthorized — missing token" });
     }
 
-    let payload;
+    let userId: string | null = null;
     try {
-      payload = verifyJwt(token);
+      const payload = verifyJwt(token);
+      userId = payload.sub;
     } catch {
+      // If token is not a JWT, check if it matches an active Better Auth session
+      try {
+        const db = mongoose.connection.useDb(env.MONGODB_DB_NAME);
+        const sessionDoc = await db.collection("session").findOne({
+          $or: [{ token }, { token: token.trim() }],
+          expiresAt: { $gt: new Date() },
+        });
+        if (sessionDoc?.userId) {
+          userId = sessionDoc.userId.toString();
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    if (!userId) {
       return res.status(401).json({ success: false, message: "Unauthorized — invalid or expired token" });
     }
 
-    const user = await User.findById(payload.sub);
+    let user = await User.findById(userId);
+    if (!user && mongoose.isValidObjectId(userId)) {
+      user = await User.findById(new mongoose.Types.ObjectId(userId));
+    }
+    if (!user) {
+      user = await User.findOne({ _id: userId });
+    }
     if (!user) {
       return res.status(401).json({ success: false, message: "Unauthorized — user no longer exists" });
     }

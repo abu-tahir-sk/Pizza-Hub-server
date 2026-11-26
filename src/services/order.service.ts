@@ -127,11 +127,14 @@ export async function getOrderStats(actor: {
   }
 
   if (role === "admin") {
-    const [total, pending] = await Promise.all([
+    const [total, pending, accepted, rejected, cancelled] = await Promise.all([
       Order.countDocuments({}),
       Order.countDocuments({ status: "pending" }),
+      Order.countDocuments({ status: "accepted" }),
+      Order.countDocuments({ status: "rejected" }),
+      Order.countDocuments({ status: "cancelled" }),
     ]);
-    return { total, pending };
+    return { total, pending, accepted, rejected, cancelled };
   }
 
   throw new HttpError(403, "Forbidden");
