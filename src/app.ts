@@ -78,6 +78,16 @@ export function createApp() {
           if (orphanedIds.length > 0) {
             await authDb.collection("account").deleteMany({ _id: { $in: orphanedIds } });
           }
+          const orphanedSessions = await authDb
+            .collection("session")
+            .find({})
+            .toArray();
+          const deadSessionIds = orphanedSessions
+            .filter((s) => !validUserIds.has(String(s.userId)))
+            .map((s) => s._id);
+          if (deadSessionIds.length > 0) {
+            await authDb.collection("session").deleteMany({ _id: { $in: deadSessionIds } });
+          }
         }
       } catch (cleanupErr) {
         console.warn("OAuth orphaned account cleanup warning:", cleanupErr);
