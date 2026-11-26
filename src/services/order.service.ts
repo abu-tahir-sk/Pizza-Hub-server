@@ -24,10 +24,17 @@ export async function createOrder(customerId: string, body: CreateOrderInput) {
     throw new HttpError(403, "You cannot order your own item");
   }
 
+  // Duplicate active order check on same calendar day
+  const dDate = new Date(body.deliveryDate);
+  const startOfDay = new Date(dDate);
+  startOfDay.setUTCHours(0, 0, 0, 0);
+  const endOfDay = new Date(dDate);
+  endOfDay.setUTCHours(23, 59, 59, 999);
+
   const duplicate = await Order.findOne({
     customerId,
     itemId: body.itemId,
-    deliveryDate: body.deliveryDate,
+    deliveryDate: { $gte: startOfDay, $lte: endOfDay },
     status: { $in: ACTIVE_STATUSES },
   });
   if (duplicate) {
@@ -94,6 +101,9 @@ export async function decideOrder(
       409,
       `This order has already been ${order.status} — it can only be decided once`
     );
+  }
+  if (!isAdmin && !["accepted", "rejected"].includes(decision.status)) {
+    throw new HttpError(400, "Vendors can only accept or reject orders");
   }
   order.status = decision.status;
   await order.save();
